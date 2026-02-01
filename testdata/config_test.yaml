@@ -1,0 +1,38 @@
+default_scope: user
+
+servers:
+  test-stdio:
+    description: Test stdio server
+    transport: stdio
+    command: /usr/bin/test-server
+    args:
+      - --flag
+      - value
+    env:
+      TEST_TOKEN:
+        required: true
+        description: Test API token
+      TEST_PATH:
+        required: false
+        description: Optional path
+        default: /default/path
+
+  test-http:
+    description: Test HTTP server
+    transport: http
+    url: http://localhost:8080
+    env:
+      API_KEY:
+        required: true
+        description: API key for authentication
+      DEBUG:
+        required: false
+        description: Enable debug mode
+        default: "false"
+
+  minimal-stdio:
+    description: Minimal stdio config
+    transport: stdio
+    command: node
+    args:
+      - server.js

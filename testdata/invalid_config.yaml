@@ -1,0 +1,13 @@
+servers:
+  invalid-transport:
+    description: Server with invalid transport
+    transport: invalid
+    command: test
+
+  missing-command:
+    description: Stdio server without command
+    transport: stdio
+
+  missing-url:
+    description: HTTP server without URL
+    transport: http
