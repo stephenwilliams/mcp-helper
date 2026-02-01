@@ -1,0 +1,46 @@
+[tools]
+go = "1.25"
+goreleaser = "latest"
+
+[tasks.build]
+description = "Build the binary using goreleaser"
+run = "goreleaser build --single-target --snapshot --clean"
+
+[tasks.release-snapshot]
+description = "Build snapshot release (all platforms)"
+run = "goreleaser release --snapshot --clean"
+
+[tasks.release]
+description = "Create a release (requires GITHUB_TOKEN)"
+run = "goreleaser release --clean"
+
+[tasks.test]
+description = "Run tests"
+run = "go test -v ./..."
+
+[tasks.test-coverage]
+description = "Run tests with coverage"
+run = """
+go test -v -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+"""
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = "rm -rf dist/ coverage.out coverage.html"
+
+[tasks.tidy]
+description = "Run go mod tidy"
+run = "go mod tidy"
+
+[tasks.lint]
+description = "Run linter"
+run = "golangci-lint run"
+
+[tasks.fmt]
+description = "Format code"
+run = "go fmt ./..."
+
+[tasks.vet]
+description = "Run go vet"
+run = "go vet ./..."

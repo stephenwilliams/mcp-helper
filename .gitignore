@@ -1,0 +1,41 @@
+# Binary
+mcp-helper
+mcp-helper.exe
+
+# Goreleaser
+dist/
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local config (don't commit personal config)
+config.yaml
+config.yml
+
+# Debug files
+*.log
+debug/
