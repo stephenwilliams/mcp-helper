@@ -1,6 +1,7 @@
 [tools]
 go = "1.25"
 goreleaser = "latest"
+svu = "latest"
 
 [tasks.build]
 description = "Build the binary using goreleaser"
@@ -12,7 +13,26 @@ run = "goreleaser release --snapshot --clean"
 
 [tasks.release]
 description = "Create a release (requires GITHUB_TOKEN)"
-run = "goreleaser release --clean"
+run = """
+git tag "$(svu next)"
+git push --tags
+goreleaser release --clean
+"""
+
+[tasks.version]
+description = "Show current version"
+run = "svu current"
+
+[tasks.version-next]
+description = "Show next version (based on commits)"
+run = "svu next"
+
+[tasks.tag]
+description = "Create and push next version tag"
+run = """
+git tag "$(svu next)"
+git push --tags
+"""
 
 [tasks.test]
 description = "Run tests"
