@@ -43,3 +43,22 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^chore:"
+
+brews:
+  - name: mcp-helper
+    repository:
+      owner: stephenwilliams
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: goreleaserbot@users.noreply.github.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    directory: Formula
+    homepage: "https://github.com/stephenwilliams/mcp-helper"
+    description: "CLI tool for managing MCP (Model Context Protocol) server configurations"
+    license: "MIT"
+    install: |
+      bin.install "mcp-helper"
+    test: |
+      system "#{bin}/mcp-helper", "version"
