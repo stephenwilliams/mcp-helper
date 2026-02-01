@@ -4,12 +4,19 @@ package claudecode
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
 )
+
+// ClaudeConfig represents the structure of Claude Code's config file
+type ClaudeConfig struct {
+	MCPServers map[string]interface{} `json:"mcpServers"`
+}
 
 // ClaudeCode implements the Adapter interface for Claude Code.
 // It uses the Claude CLI to manage MCP server configurations.
@@ -171,4 +178,26 @@ func (c *ClaudeCode) buildArgs(name string, server *config.Server, scope adapter
 	}
 
 	return args
+}
+
+// GetConfigPath returns the path to the Claude Code configuration file for the given scope.
+//
+// Parameters:
+//   - scope: The configuration scope (local, user, or project)
+//
+// Returns:
+//   - The path to the configuration file
+func (c *ClaudeCode) GetConfigPath(scope adapter.Scope) string {
+	switch scope {
+	case adapter.ScopeUser:
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		return filepath.Join(homeDir, ".claude", "config.json")
+	case adapter.ScopeProject, adapter.ScopeLocal:
+		return ".claude/config.json"
+	default:
+		return ""
+	}
 }

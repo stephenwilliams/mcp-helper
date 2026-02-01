@@ -1,0 +1,26 @@
+[default]
+region = us-west-2
+
+[profile dev-mcpro]
+sso_session = my-sso
+sso_account_id = 111122223333
+sso_role_name = DevReadOnly
+region = us-east-1
+
+[profile dev-mcprw]
+sso_session = my-sso
+sso_account_id = 111122223333
+sso_role_name = DevAdmin
+region = us-east-1
+
+[profile prod-mcpro]
+region = eu-west-1
+
+[profile regular-profile]
+region = ap-southeast-1
+
+[profile no-region-mcpro]
+
+[sso-session my-sso]
+sso_region = us-east-1
+sso_start_url = https://my-sso-portal.awsapps.com/start
