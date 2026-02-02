@@ -24,6 +24,7 @@ func IsSecret(name string) bool {
 		"SECRET",
 		"PASSWORD",
 		"CREDENTIAL",
+		"AUTHORIZATION",
 	}
 
 	for _, pattern := range secretPatterns {

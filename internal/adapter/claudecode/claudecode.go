@@ -11,6 +11,7 @@ import (
 
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
+	"github.com/stephenwilliams/mcp-helper/internal/env"
 )
 
 // ClaudeConfig represents the structure of Claude Code's config file
@@ -93,7 +94,7 @@ func (c *ClaudeCode) AddServer(name string, server *config.Server, scope adapter
 
 // DryRun returns the command string that would be executed to add the server,
 // without actually executing it. This is useful for previewing changes or
-// generating documentation.
+// generating documentation. Secret header values are masked for security.
 //
 // Parameters:
 //   - name: The unique identifier for the server
@@ -103,12 +104,44 @@ func (c *ClaudeCode) AddServer(name string, server *config.Server, scope adapter
 //
 // Returns:
 //   - A string representation of the command that would be executed
-func (c *ClaudeCode) DryRun(name string, server *config.Server, scope adapter.Scope, env map[string]string) string {
-	args := c.buildArgs(name, server, scope, env)
+func (c *ClaudeCode) DryRun(name string, server *config.Server, scope adapter.Scope, envVars map[string]string) string {
+	args := c.buildArgs(name, server, scope, envVars)
 
-	// Build the command string with proper quoting
+	// Build the command string with proper quoting and masking
 	parts := []string{c.claudePath}
-	for _, arg := range args {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		// Check if this is a header flag followed by a header value
+		if arg == "-H" && i+1 < len(args) {
+			parts = append(parts, arg)
+			i++
+			headerArg := args[i]
+			// Parse "HeaderName: Value" format and mask if secret
+			if colonIdx := strings.Index(headerArg, ": "); colonIdx > 0 {
+				headerName := headerArg[:colonIdx]
+				headerValue := headerArg[colonIdx+2:]
+				maskedValue := headerValue
+				if env.IsSecret(headerName) {
+					maskedValue = "***MASKED***"
+				}
+				maskedArg := fmt.Sprintf("%s: %s", headerName, maskedValue)
+				if strings.Contains(maskedArg, " ") {
+					parts = append(parts, fmt.Sprintf(`"%s"`, maskedArg))
+				} else {
+					parts = append(parts, maskedArg)
+				}
+			} else {
+				// Fallback: quote if has space
+				if strings.Contains(headerArg, " ") {
+					parts = append(parts, fmt.Sprintf(`"%s"`, headerArg))
+				} else {
+					parts = append(parts, headerArg)
+				}
+			}
+			continue
+		}
+
 		// Quote arguments that contain spaces
 		if strings.Contains(arg, " ") {
 			parts = append(parts, fmt.Sprintf(`"%s"`, arg))
@@ -162,6 +195,13 @@ func (c *ClaudeCode) buildArgs(name string, server *config.Server, scope adapter
 	// Add environment variables
 	for key, val := range mergedEnv {
 		args = append(args, "-e", fmt.Sprintf("%s=%s", key, val))
+	}
+
+	// Add headers for HTTP transport
+	if server.Transport == "http" && server.Headers != nil {
+		for name, value := range server.Headers {
+			args = append(args, "-H", fmt.Sprintf("%s: %s", name, value))
+		}
 	}
 
 	// Add name

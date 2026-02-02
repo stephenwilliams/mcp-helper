@@ -122,6 +122,43 @@ func TestProcessServer(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "template in headers",
+			server: &config.Server{
+				Transport: "http",
+				URL:       "http://localhost:8080",
+				Headers: map[string]string{
+					"Authorization": "Bearer {{ .Env.API_TOKEN }}",
+					"X-Tenant-ID":   "{{ .Env.TENANT_ID }}",
+				},
+			},
+			data: &TemplateData{Env: map[string]string{
+				"API_TOKEN": "secret123",
+				"TENANT_ID": "tenant-456",
+			}},
+			check: func(t *testing.T, s *config.Server) {
+				if s.Headers["Authorization"] != "Bearer secret123" {
+					t.Errorf("Authorization header = %q, want %q", s.Headers["Authorization"], "Bearer secret123")
+				}
+				if s.Headers["X-Tenant-ID"] != "tenant-456" {
+					t.Errorf("X-Tenant-ID header = %q, want %q", s.Headers["X-Tenant-ID"], "tenant-456")
+				}
+			},
+		},
+		{
+			name: "nil headers passthrough",
+			server: &config.Server{
+				Transport: "http",
+				URL:       "http://localhost:8080",
+				Headers:   nil,
+			},
+			data: NewTemplateData(),
+			check: func(t *testing.T, s *config.Server) {
+				if s.Headers != nil {
+					t.Errorf("Headers should be nil, got %v", s.Headers)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {

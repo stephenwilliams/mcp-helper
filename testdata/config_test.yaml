@@ -36,3 +36,19 @@ servers:
     command: node
     args:
       - server.js
+
+  test-http-with-headers:
+    description: HTTP server with authentication headers
+    transport: http
+    url: http://localhost:6700/servers/gitlab/mcp
+    headers:
+      Authorization: "Bearer {{ env \"API_TOKEN\" }}"
+      X-Tenant-ID: "{{ env \"TENANT_ID\" }}"
+    env:
+      API_TOKEN:
+        required: true
+        description: API authentication token
+      TENANT_ID:
+        required: false
+        description: Tenant identifier
+        default: "default-tenant"

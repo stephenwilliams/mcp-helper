@@ -228,6 +228,73 @@ func TestDryRun_HttpTransport(t *testing.T) {
 			},
 			wantNotContain: []string{" -- "},
 		},
+		{
+			name:       "http with headers",
+			serverName: "api-server",
+			server: &config.Server{
+				Transport: "http",
+				URL:       "https://api.example.com/mcp",
+				Headers: map[string]string{
+					"Authorization": "Bearer token123",
+					"X-Custom":      "custom-value",
+				},
+			},
+			scope: adapter.ScopeUser,
+			env:   nil,
+			wantContains: []string{
+				"--transport",
+				"http",
+				"-H",
+				"***MASKED***",
+				"X-Custom: custom-value",
+				"api-server",
+				"https://api.example.com/mcp",
+			},
+			wantNotContain: []string{
+				" -- ",
+				"Bearer token123",
+			},
+		},
+		{
+			name:       "http with secret headers masked",
+			serverName: "secure-api",
+			server: &config.Server{
+				Transport: "http",
+				URL:       "https://api.example.com/mcp",
+				Headers: map[string]string{
+					"Authorization": "Bearer supersecret",
+					"X-API-Key":     "key123",
+					"X-Request-ID":  "req-456",
+				},
+			},
+			scope: adapter.ScopeUser,
+			env:   nil,
+			wantContains: []string{
+				"-H",
+				"***MASKED***",
+				"X-Request-ID: req-456",
+			},
+			wantNotContain: []string{
+				"supersecret",
+				"key123",
+			},
+		},
+		{
+			name:       "stdio ignores headers",
+			serverName: "stdio-server",
+			server: &config.Server{
+				Transport: "stdio",
+				Command:   "node",
+				Args:      []string{"server.js"},
+				Headers: map[string]string{
+					"Authorization": "Bearer token123",
+				},
+			},
+			scope:        adapter.ScopeUser,
+			env:          nil,
+			wantContains: []string{"mcp", "add", "node"},
+			wantNotContain: []string{"-H", "Authorization"},
+		},
 	}
 
 	for _, tt := range tests {

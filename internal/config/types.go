@@ -19,6 +19,7 @@ type Server struct {
 	Command     string            `yaml:"command" mapstructure:"command"`     // For stdio
 	Args        []string          `yaml:"args" mapstructure:"args"`           // For stdio
 	URL         string            `yaml:"url" mapstructure:"url"`             // For http
+	Headers     map[string]string `yaml:"headers" mapstructure:"headers"`     // For http
 	Env         map[string]EnvVar `yaml:"env" mapstructure:"env"`
 }
 

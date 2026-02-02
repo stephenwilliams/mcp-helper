@@ -24,6 +24,8 @@ func TestIsSecret(t *testing.T) {
 		{"contains password lowercase", "user_password", true},
 		{"contains CREDENTIAL", "AWS_CREDENTIAL", true},
 		{"contains credential lowercase", "git_credential", true},
+		{"contains AUTHORIZATION", "Authorization", true},
+		{"contains authorization lowercase", "x-authorization", true},
 
 		// Non-secret patterns
 		{"plain name", "DEBUG", false},

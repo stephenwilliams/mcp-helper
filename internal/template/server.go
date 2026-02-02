@@ -51,6 +51,18 @@ func ProcessServer(server *config.Server, data *TemplateData) (*config.Server, e
 	}
 	processed.URL = url
 
+	// Process Headers (only values are templated, names are literal)
+	if server.Headers != nil {
+		processed.Headers = make(map[string]string, len(server.Headers))
+		for name, value := range server.Headers {
+			processedValue, err := ProcessString(value, data)
+			if err != nil {
+				return nil, fmt.Errorf("processing header %q value %q: %w", name, value, err)
+			}
+			processed.Headers[name] = processedValue
+		}
+	}
+
 	// Process EnvVar defaults (CRITICAL: must happen before CollectEnvVars)
 	for name, envVar := range server.Env {
 		processedDefault, err := ProcessString(envVar.Default, data)

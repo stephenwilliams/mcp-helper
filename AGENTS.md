@@ -71,6 +71,11 @@ User → CLI (cmd/) → Config (internal/config/)
                                → Template processing (internal/template/)
 ```
 
+**HTTP Transport Features:**
+- Headers support via `-H` flags (e.g., `Authorization: Bearer ...`)
+- Template processing in header values
+- Secret header values masked in dry-run output
+
 ## Dependencies
 
 ### External

@@ -44,8 +44,8 @@ func TestLoadFromPath_ValidConfig(t *testing.T) {
 		t.Errorf("DefaultScope = %q, want %q", cfg.DefaultScope, "user")
 	}
 
-	if len(cfg.Servers) != 3 {
-		t.Errorf("len(Servers) = %d, want 3", len(cfg.Servers))
+	if len(cfg.Servers) != 4 {
+		t.Errorf("len(Servers) = %d, want 4", len(cfg.Servers))
 	}
 
 	// Test stdio server
