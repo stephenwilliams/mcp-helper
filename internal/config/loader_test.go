@@ -12,12 +12,15 @@ func TestLoad_NoConfigFile(t *testing.T) {
 	defer func() {
 		os.Setenv("MCP_HELPER_CONFIG", oldEnv)
 		os.Chdir(oldDir)
+		SetConfigDirOverride("") // Clear the override
 	}()
 
 	// Create a temp directory with no config file and change to it
 	tmpDir := t.TempDir()
 	os.Chdir(tmpDir)
 	os.Unsetenv("MCP_HELPER_CONFIG")
+	// Override the config directory to prevent finding user's config
+	SetConfigDirOverride(tmpDir)
 
 	cfg, err := Load()
 	if err != nil {

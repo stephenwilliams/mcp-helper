@@ -14,8 +14,21 @@ const (
 	DefaultConfigFileName = "config.yaml"
 )
 
+// configDirOverride allows tests to override the config directory.
+// When empty, the XDG config directory is used.
+var configDirOverride string
+
+// SetConfigDirOverride sets an override for the config directory (for testing).
+// Pass empty string to clear the override and use the default XDG directory.
+func SetConfigDirOverride(dir string) {
+	configDirOverride = dir
+}
+
 // GetConfigDir returns the XDG-compliant config directory for mcp-helper
 func GetConfigDir() (string, error) {
+	if configDirOverride != "" {
+		return configDirOverride, nil
+	}
 	return filepath.Join(xdg.ConfigHome, AppName), nil
 }
 
