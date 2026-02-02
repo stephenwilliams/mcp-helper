@@ -5,12 +5,12 @@ project_name: mcp-helper
 before:
   hooks:
     - go mod tidy
-    # Generate shell completions
+    # Generate shell completions in project root completions dir
     - go build -o /tmp/mcp-helper-completions .
     - mkdir -p completions
-    - /tmp/mcp-helper-completions completion bash > completions/mcp-helper.bash
-    - /tmp/mcp-helper-completions completion zsh > completions/mcp-helper.zsh
-    - /tmp/mcp-helper-completions completion fish > completions/mcp-helper.fish
+    - sh -c '/tmp/mcp-helper-completions completion bash > completions/mcp-helper.bash'
+    - sh -c '/tmp/mcp-helper-completions completion zsh > completions/mcp-helper.zsh'
+    - sh -c '/tmp/mcp-helper-completions completion fish > completions/mcp-helper.fish'
 
 builds:
   - id: mcp-helper
