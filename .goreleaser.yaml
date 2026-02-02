@@ -36,7 +36,8 @@ archives:
       - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
-      - completions/*
+      - src: completions/*
+        dst: completions
 
 checksum:
   name_template: "checksums.txt"
