@@ -14,10 +14,11 @@ import (
 var infoJSONFlag bool
 
 var infoCmd = &cobra.Command{
-	Use:   "info <name>",
-	Short: "Display detailed information about an MCP server",
-	Long:  `Display full configuration details for a specific MCP server including transport, command, environment variables, and metadata.`,
-	Args:  cobra.ExactArgs(1),
+	Use:               "info <name>",
+	Short:             "Display detailed information about an MCP server",
+	Long:              `Display full configuration details for a specific MCP server including transport, command, environment variables, and metadata.`,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: ServerNameCompletion,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		serverName := args[0]
 

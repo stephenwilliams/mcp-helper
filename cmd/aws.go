@@ -70,6 +70,9 @@ func init() {
 	awsDiscoverCmd.Flags().BoolVar(&awsDiscoverJSON, "json", false, "Output discovered profiles in JSON format (non-interactive)")
 	awsDiscoverCmd.Flags().BoolVar(&awsDiscoverDryRun, "dry-run", false, "Show what would be added without actually adding")
 	awsDiscoverCmd.Flags().BoolVar(&awsDiscoverForce, "force", false, "Overwrite existing servers (default: skip with warning)")
+
+	// Register completions
+	awsDiscoverCmd.RegisterFlagCompletionFunc("scope", ScopeCompletion)
 }
 
 func runAwsDiscover(cmd *cobra.Command, args []string) error {

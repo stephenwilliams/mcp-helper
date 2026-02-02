@@ -5,6 +5,12 @@ project_name: mcp-helper
 before:
   hooks:
     - go mod tidy
+    # Generate shell completions
+    - go build -o /tmp/mcp-helper-completions .
+    - mkdir -p completions
+    - /tmp/mcp-helper-completions completion bash > completions/mcp-helper.bash
+    - /tmp/mcp-helper-completions completion zsh > completions/mcp-helper.zsh
+    - /tmp/mcp-helper-completions completion fish > completions/mcp-helper.fish
 
 builds:
   - id: mcp-helper
@@ -29,6 +35,8 @@ archives:
     formats:
       - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - completions/*
 
 checksum:
   name_template: "checksums.txt"
@@ -59,3 +67,7 @@ homebrew_casks:
     description: "CLI tool for managing MCP (Model Context Protocol) server configurations"
     binaries:
       - mcp-helper
+    completions:
+      bash: completions/mcp-helper.bash
+      zsh: completions/mcp-helper.zsh
+      fish: completions/mcp-helper.fish

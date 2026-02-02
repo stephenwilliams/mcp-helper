@@ -4,6 +4,7 @@ mcp-helper.exe
 
 # Goreleaser
 dist/
+completions/
 
 # Build artifacts
 *.exe

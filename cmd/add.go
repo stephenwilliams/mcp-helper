@@ -41,8 +41,9 @@ Examples:
 
   # Fail if env vars are missing (no prompts)
   mcp-helper add github --no-prompt`,
-	Args: cobra.ExactArgs(1),
-	RunE: runAdd,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: ServerNameCompletion,
+	RunE:              runAdd,
 }
 
 func init() {
@@ -52,6 +53,9 @@ func init() {
 	addCmd.Flags().StringSliceVarP(&addEnvVars, "env", "e", nil, "Environment variable (KEY=VALUE, repeatable)")
 	addCmd.Flags().BoolVar(&addDryRun, "dry-run", false, "Show command without executing")
 	addCmd.Flags().BoolVar(&addNoPrompt, "no-prompt", false, "Fail if env vars missing instead of prompting")
+
+	// Register completions
+	addCmd.RegisterFlagCompletionFunc("scope", ScopeCompletion)
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
