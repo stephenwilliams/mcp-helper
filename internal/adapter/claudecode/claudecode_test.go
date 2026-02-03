@@ -479,3 +479,42 @@ func TestBuildArgs_HeadersAfterPositionals(t *testing.T) {
 		t.Errorf("-H flag (idx %d) appears before URL (idx %d); Claude CLI requires positionals first", headerIdx, urlIdx)
 	}
 }
+
+func TestBuildArgs_NameBeforeEnvVars(t *testing.T) {
+	cc := New()
+	server := &config.Server{
+		Command: "node",
+		Args:    []string{"server.js"},
+		Env: map[string]config.EnvVar{
+			"API_KEY": {Default: "test-key"},
+		},
+	}
+
+	args := cc.buildArgs("test-server", server, adapter.ScopeUser, map[string]string{
+		"API_KEY": "actual-key",
+	})
+
+	// Find indices
+	nameIdx := -1
+	firstEnvIdx := -1
+	for i, arg := range args {
+		if arg == "test-server" {
+			nameIdx = i
+		}
+		if arg == "-e" && firstEnvIdx == -1 {
+			firstEnvIdx = i
+		}
+	}
+
+	if nameIdx == -1 {
+		t.Fatal("name 'test-server' not found in args")
+	}
+	if firstEnvIdx == -1 {
+		t.Fatal("no -e flag found in args")
+	}
+	// Critical assertion: name must come BEFORE -e flags
+	// Claude CLI interprets positional args after -e as malformed env var values
+	if nameIdx >= firstEnvIdx {
+		t.Errorf("name must come before -e flags: name at index %d, first -e at index %d", nameIdx, firstEnvIdx)
+	}
+}

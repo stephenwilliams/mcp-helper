@@ -63,7 +63,7 @@ func (c *ClaudeCode) Name() string {
 // It supports both stdio and HTTP transports and handles environment variable configuration.
 //
 // For stdio transport, the command format is:
-//   claude mcp add --scope <scope> [-e KEY=val]... <name> -- <command> [args...]
+//   claude mcp add --scope <scope> <name> [-e KEY=val]... -- <command> [args...]
 //
 // For HTTP transport, the command format is:
 //   claude mcp add --transport http --scope <scope> <name> <url>
@@ -175,6 +175,9 @@ func (c *ClaudeCode) buildArgs(name string, server *config.Server, scope adapter
 	// Add scope
 	args = append(args, "--scope", string(scope))
 
+	// Add name (MUST come before -e flags per Claude CLI argument parser)
+	args = append(args, name)
+
 	// Merge environment variables
 	mergedEnv := make(map[string]string)
 	// First, add server's environment variables
@@ -196,9 +199,6 @@ func (c *ClaudeCode) buildArgs(name string, server *config.Server, scope adapter
 	for key, val := range mergedEnv {
 		args = append(args, "-e", fmt.Sprintf("%s=%s", key, val))
 	}
-
-	// Add name
-	args = append(args, name)
 
 	// Add command and args for stdio, or URL for http
 	if server.Transport == "http" {
