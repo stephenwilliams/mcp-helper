@@ -197,13 +197,6 @@ func (c *ClaudeCode) buildArgs(name string, server *config.Server, scope adapter
 		args = append(args, "-e", fmt.Sprintf("%s=%s", key, val))
 	}
 
-	// Add headers for HTTP transport
-	if server.Transport == "http" && server.Headers != nil {
-		for name, value := range server.Headers {
-			args = append(args, "-H", fmt.Sprintf("%s: %s", name, value))
-		}
-	}
-
 	// Add name
 	args = append(args, name)
 
@@ -215,6 +208,14 @@ func (c *ClaudeCode) buildArgs(name string, server *config.Server, scope adapter
 		args = append(args, "--")
 		args = append(args, server.Command)
 		args = append(args, server.Args...)
+	}
+
+	// Add headers for HTTP transport (MUST come after positional arguments
+	// because Claude CLI's argument parser requires positionals before variadic -H flags)
+	if server.Transport == "http" && server.Headers != nil {
+		for name, value := range server.Headers {
+			args = append(args, "-H", fmt.Sprintf("%s: %s", name, value))
+		}
 	}
 
 	return args

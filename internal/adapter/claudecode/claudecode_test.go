@@ -429,3 +429,53 @@ func TestAddServer_NonExistentClaude(t *testing.T) {
 		t.Errorf("AddServer() error should mention missing executable, got: %v", err)
 	}
 }
+
+func TestBuildArgs_HeadersAfterPositionals(t *testing.T) {
+	cc := New()
+	server := &config.Server{
+		Transport: "http",
+		URL:       "https://api.example.com/mcp",
+		Headers: map[string]string{
+			"Authorization": "Bearer token123",
+		},
+	}
+
+	args := cc.buildArgs("test-server", server, adapter.ScopeLocal, nil)
+
+	// Find positions of key elements
+	nameIdx := -1
+	urlIdx := -1
+	headerIdx := -1
+
+	for i, arg := range args {
+		if arg == "test-server" {
+			nameIdx = i
+		}
+		if arg == "https://api.example.com/mcp" {
+			urlIdx = i
+		}
+		if arg == "-H" {
+			headerIdx = i
+		}
+	}
+
+	// Verify all elements exist
+	if nameIdx == -1 {
+		t.Fatal("name not found in args")
+	}
+	if urlIdx == -1 {
+		t.Fatal("URL not found in args")
+	}
+	if headerIdx == -1 {
+		t.Fatal("-H flag not found in args")
+	}
+
+	// Critical assertion: headers must come AFTER positional arguments
+	// Claude CLI's argument parser requires positionals before variadic -H flags
+	if headerIdx < nameIdx {
+		t.Errorf("-H flag (idx %d) appears before name (idx %d); Claude CLI requires positionals first", headerIdx, nameIdx)
+	}
+	if headerIdx < urlIdx {
+		t.Errorf("-H flag (idx %d) appears before URL (idx %d); Claude CLI requires positionals first", headerIdx, urlIdx)
+	}
+}
