@@ -14,19 +14,15 @@ func GenerateServerName(profile MCPProfile) string {
 
 // GenerateServer creates a complete Server configuration from an MCP profile.
 func GenerateServer(profile MCPProfile) *config.Server {
-	// Determine permission and mode description based on profile mode
-	var permission string
+	// Determine mode description based on profile mode
 	var modeDesc string
 
 	switch profile.Mode {
 	case "ro":
-		permission = "aws-mcp:CallReadOnlyTool"
 		modeDesc = "read-only"
 	case "rw":
-		permission = "aws-mcp:CallReadWriteTool"
 		modeDesc = "read-write"
 	default:
-		permission = "aws-mcp:CallReadOnlyTool"
 		modeDesc = "read-only"
 	}
 
@@ -36,12 +32,19 @@ func GenerateServer(profile MCPProfile) *config.Server {
 	// Build args array
 	args := []string{
 		"mcp-proxy-for-aws@latest",
-		"--permission",
-		permission,
-		"--metadata",
-		fmt.Sprintf("AWS_REGION=%s", profile.Region),
-		"https://aws-mcp.us-east-1.api.aws/mcp",
+		"--profile",
+		profile.Name,
+		"--region",
+		profile.Region,
 	}
+
+	// Add --read-only flag for read-only mode (no value, just the flag)
+	if profile.Mode == "ro" {
+		args = append(args, "--read-only")
+	}
+
+	// URL must be last
+	args = append(args, "https://aws-mcp.us-east-1.api.aws/mcp")
 
 	// Build env map
 	env := map[string]config.EnvVar{

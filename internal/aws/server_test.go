@@ -66,12 +66,26 @@ func TestGenerateServer_ReadOnly(t *testing.T) {
 	if !strings.Contains(argsStr, "mcp-proxy-for-aws@latest") {
 		t.Error("args should contain mcp-proxy-for-aws@latest")
 	}
-	if !strings.Contains(argsStr, "aws-mcp:CallReadOnlyTool") {
-		t.Error("args should contain read-only permission")
+
+	// Verify correct flags are present
+	if !strings.Contains(argsStr, "--profile dev-mcpro") {
+		t.Error("args should contain --profile with profile name")
 	}
-	if !strings.Contains(argsStr, "AWS_REGION=us-east-1") {
-		t.Error("args should contain region metadata")
+	if !strings.Contains(argsStr, "--region us-east-1") {
+		t.Error("args should contain --region with region value")
 	}
+	if !strings.Contains(argsStr, "--read-only") {
+		t.Error("args should contain --read-only flag for ro mode")
+	}
+
+	// Verify invalid flags are NOT present
+	if strings.Contains(argsStr, "--permission") {
+		t.Error("args should NOT contain --permission flag")
+	}
+	if strings.Contains(argsStr, "--metadata") {
+		t.Error("args should NOT contain --metadata flag")
+	}
+
 	if !strings.Contains(argsStr, "https://aws-mcp.us-east-1.api.aws/mcp") {
 		t.Error("args should contain AWS MCP endpoint URL")
 	}
@@ -106,11 +120,26 @@ func TestGenerateServer_ReadWrite(t *testing.T) {
 
 	// Check args contain expected values
 	argsStr := strings.Join(server.Args, " ")
-	if !strings.Contains(argsStr, "aws-mcp:CallReadWriteTool") {
-		t.Error("args should contain read-write permission")
+
+	// Verify correct flags are present
+	if !strings.Contains(argsStr, "--profile prod-mcprw") {
+		t.Error("args should contain --profile with profile name")
 	}
-	if !strings.Contains(argsStr, "AWS_REGION=eu-west-1") {
-		t.Error("args should contain region metadata")
+	if !strings.Contains(argsStr, "--region eu-west-1") {
+		t.Error("args should contain --region with region value")
+	}
+
+	// Verify --read-only is NOT present for rw mode
+	if strings.Contains(argsStr, "--read-only") {
+		t.Error("args should NOT contain --read-only flag for rw mode")
+	}
+
+	// Verify invalid flags are NOT present
+	if strings.Contains(argsStr, "--permission") {
+		t.Error("args should NOT contain --permission flag")
+	}
+	if strings.Contains(argsStr, "--metadata") {
+		t.Error("args should NOT contain --metadata flag")
 	}
 
 	// Check env
@@ -139,7 +168,7 @@ func TestGenerateServer_DifferentRegions(t *testing.T) {
 			server := GenerateServer(profile)
 			argsStr := strings.Join(server.Args, " ")
 
-			expectedRegion := "AWS_REGION=" + region
+			expectedRegion := "--region " + region
 			if !strings.Contains(argsStr, expectedRegion) {
 				t.Errorf("args should contain %s", expectedRegion)
 			}
