@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
-	"github.com/stephenwilliams/mcp-helper/internal/adapter/claudecode"
 	"github.com/stephenwilliams/mcp-helper/internal/env"
 	"github.com/stephenwilliams/mcp-helper/internal/template"
 )
@@ -112,23 +111,26 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Create adapter
-	ccAdapter := claudecode.New()
+	// Get adapter based on --agent flag or config default
+	adptr, err := GetAdapter()
+	if err != nil {
+		return err
+	}
 
 	// Dry run or execute (server already processed, no template work needed in adapter)
 	if addDryRun {
-		dryRunOutput := ccAdapter.DryRun(serverName, processedServer, parsedScope, collectedEnv)
+		dryRunOutput := adptr.DryRun(serverName, processedServer, parsedScope, collectedEnv)
 		fmt.Println("Command that would be executed:")
 		fmt.Println(dryRunOutput)
 		return nil
 	}
 
 	// Execute
-	if err := ccAdapter.AddServer(serverName, processedServer, parsedScope, collectedEnv); err != nil {
+	if err := adptr.AddServer(serverName, processedServer, parsedScope, collectedEnv); err != nil {
 		return err
 	}
 
-	fmt.Printf("Successfully added server '%s' to %s (scope: %s)\n", serverName, ccAdapter.Name(), parsedScope)
+	fmt.Printf("Successfully added server '%s' to %s (scope: %s)\n", serverName, adptr.Name(), parsedScope)
 	return nil
 }
 

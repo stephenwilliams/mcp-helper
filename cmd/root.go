@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/stephenwilliams/mcp-helper/internal/adapter/claudecode"
+	"github.com/stephenwilliams/mcp-helper/internal/adapter"
+	_ "github.com/stephenwilliams/mcp-helper/internal/adapter/claudecode"
+	_ "github.com/stephenwilliams/mcp-helper/internal/adapter/opencode"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
 	"github.com/stephenwilliams/mcp-helper/tui"
 )
@@ -15,8 +17,9 @@ var (
 	Commit    = "none"
 	BuildDate = "unknown"
 
-	cfgFile string
-	cfg     *config.Config
+	cfgFile   string
+	cfg       *config.Config
+	agentName string
 )
 
 var rootCmd = &cobra.Command{
@@ -36,6 +39,7 @@ func Execute() error {
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: $XDG_CONFIG_HOME/mcp-helper/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&agentName, "agent", "", "Target agent: claudecode (cc), opencode (oc) (default from config or 'claudecode')")
 
 	// Add subcommands
 	rootCmd.AddCommand(browseCmd)
@@ -70,6 +74,15 @@ func GetConfig() *config.Config {
 	return cfg
 }
 
+// GetAdapter returns the adapter based on --agent flag or config default.
+func GetAdapter() (adapter.Adapter, error) {
+	configDefault := ""
+	if cfg != nil {
+		configDefault = cfg.DefaultAgent
+	}
+	return adapter.GetWithDefault(agentName, configDefault)
+}
+
 var browseCmd = &cobra.Command{
 	Use:     "browse",
 	Aliases: []string{"interactive", "ui"},
@@ -80,10 +93,13 @@ var browseCmd = &cobra.Command{
 			return fmt.Errorf("no configuration found: please run 'mcp-helper init' first")
 		}
 
-		// Create the adapter for installing servers
-		adapter := claudecode.New()
+		// Get the adapter for installing servers
+		adptr, err := GetAdapter()
+		if err != nil {
+			return err
+		}
 
 		// Launch the TUI
-		return tui.Run(cfg, adapter)
+		return tui.Run(cfg, adptr)
 	},
 }

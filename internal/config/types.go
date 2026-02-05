@@ -7,6 +7,7 @@ package config
 // It contains the default scope for operations and a map of server configurations.
 type Config struct {
 	DefaultScope string             `yaml:"default_scope" mapstructure:"default_scope"`
+	DefaultAgent string             `yaml:"default_agent" mapstructure:"default_agent"`
 	Servers      map[string]*Server `yaml:"servers" mapstructure:"servers"`
 }
 

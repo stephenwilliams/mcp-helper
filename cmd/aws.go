@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
-	"github.com/stephenwilliams/mcp-helper/internal/adapter/claudecode"
 	"github.com/stephenwilliams/mcp-helper/internal/aws"
 	"github.com/stephenwilliams/mcp-helper/internal/env"
 	"github.com/stephenwilliams/mcp-helper/internal/template"
@@ -248,7 +247,10 @@ func outputDryRun(profiles []aws.MCPProfile) error {
 
 // addProfiles adds the selected profiles to Claude Code
 func addProfiles(profiles []aws.MCPProfile, scope adapter.Scope) error {
-	ccAdapter := claudecode.New()
+	adptr, err := GetAdapter()
+	if err != nil {
+		return err
+	}
 
 	addedCount := 0
 	skippedCount := 0
@@ -277,14 +279,14 @@ func addProfiles(profiles []aws.MCPProfile, scope adapter.Scope) error {
 		}
 
 		// Check if server already exists
-		if serverExists(ccAdapter, serverName, scope) && !awsDiscoverForce {
+		if adptr.ServerExists(serverName, scope) && !awsDiscoverForce {
 			fmt.Printf("⚠ Skipping '%s': server already exists (use --force to overwrite)\n", serverName)
 			skippedCount++
 			continue
 		}
 
 		// Add server
-		if err := ccAdapter.AddServer(serverName, processedServer, scope, collectedEnv); err != nil {
+		if err := adptr.AddServer(serverName, processedServer, scope, collectedEnv); err != nil {
 			fmt.Printf("✗ Failed to add '%s': %v\n", serverName, err)
 			errorCount++
 			continue
@@ -316,28 +318,4 @@ func addProfiles(profiles []aws.MCPProfile, scope adapter.Scope) error {
 	}
 
 	return nil
-}
-
-// serverExists checks if a server already exists in the configuration
-func serverExists(ccAdapter *claudecode.ClaudeCode, serverName string, scope adapter.Scope) bool {
-	// Read existing configuration
-	configPath := ccAdapter.GetConfigPath(scope)
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return false
-	}
-
-	// Parse existing config
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return false
-	}
-
-	var existingConfig claudecode.ClaudeConfig
-	if err := json.Unmarshal(data, &existingConfig); err != nil {
-		return false
-	}
-
-	// Check if server exists
-	_, exists := existingConfig.MCPServers[serverName]
-	return exists
 }

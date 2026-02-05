@@ -84,4 +84,27 @@ type Adapter interface {
 	// Returns:
 	//   - A string representation of the command or configuration changes
 	DryRun(name string, server *config.Server, scope Scope, env map[string]string) string
+
+	// GetConfigPath returns the absolute path to the configuration file for the given scope.
+	// The path is adapter-specific and depends on the target environment's configuration
+	// file location conventions.
+	//
+	// Parameters:
+	//   - scope: The configuration scope (local, user, or project)
+	//
+	// Returns:
+	//   - The absolute path to the configuration file
+	GetConfigPath(scope Scope) string
+
+	// ServerExists checks whether a server with the given name is already configured
+	// in the specified scope. This is useful for preventing duplicate server entries
+	// or validating server configurations before modifications.
+	//
+	// Parameters:
+	//   - name: The unique identifier for the server
+	//   - scope: The configuration scope (local, user, or project)
+	//
+	// Returns:
+	//   - true if the server exists in the configuration, false otherwise
+	ServerExists(name string, scope Scope) bool
 }

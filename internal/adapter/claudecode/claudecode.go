@@ -3,6 +3,7 @@
 package claudecode
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,6 +14,12 @@ import (
 	"github.com/stephenwilliams/mcp-helper/internal/config"
 	"github.com/stephenwilliams/mcp-helper/internal/env"
 )
+
+func init() {
+	adapter.Register("claudecode", func() adapter.Adapter { return New() })
+	adapter.Register("claude-code", func() adapter.Adapter { return New() })
+	adapter.Register("cc", func() adapter.Adapter { return New() })
+}
 
 // ClaudeConfig represents the structure of Claude Code's config file
 type ClaudeConfig struct {
@@ -241,4 +248,32 @@ func (c *ClaudeCode) GetConfigPath(scope adapter.Scope) string {
 	default:
 		return ""
 	}
+}
+
+// ServerExists checks if a server with the given name exists in the Claude Code configuration.
+//
+// Parameters:
+//   - name: The server name to check
+//   - scope: The configuration scope to check
+//
+// Returns:
+//   - true if the server exists, false otherwise
+func (c *ClaudeCode) ServerExists(name string, scope adapter.Scope) bool {
+	configPath := c.GetConfigPath(scope)
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return false
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return false
+	}
+
+	var existingConfig ClaudeConfig
+	if err := json.Unmarshal(data, &existingConfig); err != nil {
+		return false
+	}
+
+	_, exists := existingConfig.MCPServers[name]
+	return exists
 }
