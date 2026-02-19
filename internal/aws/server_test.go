@@ -74,10 +74,6 @@ func TestGenerateServer_ReadOnly(t *testing.T) {
 	if !strings.Contains(argsStr, "--region us-east-1") {
 		t.Error("args should contain --region with region value")
 	}
-	if !strings.Contains(argsStr, "--read-only") {
-		t.Error("args should contain --read-only flag for ro mode")
-	}
-
 	// Verify invalid flags are NOT present
 	if strings.Contains(argsStr, "--permission") {
 		t.Error("args should NOT contain --permission flag")
@@ -127,11 +123,6 @@ func TestGenerateServer_ReadWrite(t *testing.T) {
 	}
 	if !strings.Contains(argsStr, "--region eu-west-1") {
 		t.Error("args should contain --region with region value")
-	}
-
-	// Verify --read-only is NOT present for rw mode
-	if strings.Contains(argsStr, "--read-only") {
-		t.Error("args should NOT contain --read-only flag for rw mode")
 	}
 
 	// Verify invalid flags are NOT present

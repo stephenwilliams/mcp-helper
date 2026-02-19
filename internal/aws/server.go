@@ -38,11 +38,6 @@ func GenerateServer(profile MCPProfile) *config.Server {
 		profile.Region,
 	}
 
-	// Add --read-only flag for read-only mode (no value, just the flag)
-	if profile.Mode == "ro" {
-		args = append(args, "--read-only")
-	}
-
 	// URL must be last
 	args = append(args, "https://aws-mcp.us-east-1.api.aws/mcp")
 
