@@ -21,8 +21,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
-          install-mode: goinstall
+          version: v2.0.2
           # Only report new issues on PRs (don't fail on pre-existing issues)
           only-new-issues: true
 
