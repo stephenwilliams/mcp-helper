@@ -9,6 +9,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
+	envpkg "github.com/stephenwilliams/mcp-helper/internal/env"
+	"github.com/stephenwilliams/mcp-helper/tui/components"
 )
 
 // State represents the current state of the TUI
@@ -122,46 +124,24 @@ func NewModelWithOptions(cfg *config.Config, adptr adapter.Adapter, scope adapte
 
 // updateFilter filters the server list based on filterText
 func (m *Model) updateFilter() {
-	if m.filterText == "" {
-		m.filteredServers = m.servers
-		return
-	}
-	m.filteredServers = nil
-	lower := strings.ToLower(m.filterText)
-	for _, name := range m.servers {
+	result := FilterItems(m.servers, m.filterText, m.cursor, func(name string, lower string) bool {
 		server := m.config.Servers[name]
-		// Match against name or description
-		if strings.Contains(strings.ToLower(name), lower) ||
-			(server != nil && strings.Contains(strings.ToLower(server.Description), lower)) {
-			m.filteredServers = append(m.filteredServers, name)
-		}
-	}
-	// Reset cursor if it's out of bounds
-	if m.cursor >= len(m.filteredServers) {
-		m.cursor = 0
-	}
+		return strings.Contains(strings.ToLower(name), lower) ||
+			(server != nil && strings.Contains(strings.ToLower(server.Description), lower))
+	})
+	m.filteredServers = result.Items
+	m.cursor = result.Cursor
 }
 
 // updatePresetFilter filters the preset list based on filterText
 func (m *Model) updatePresetFilter() {
-	if m.filterText == "" {
-		m.filteredPresets = m.presets
-		return
-	}
-	m.filteredPresets = nil
-	lower := strings.ToLower(m.filterText)
-	for _, name := range m.presets {
+	result := FilterItems(m.presets, m.filterText, m.presetCursor, func(name string, lower string) bool {
 		preset := m.config.Presets[name]
-		// Match against name or description
-		if strings.Contains(strings.ToLower(name), lower) ||
-			(preset != nil && strings.Contains(strings.ToLower(preset.Description), lower)) {
-			m.filteredPresets = append(m.filteredPresets, name)
-		}
-	}
-	// Reset cursor if out of bounds
-	if m.presetCursor >= len(m.filteredPresets) {
-		m.presetCursor = 0
-	}
+		return strings.Contains(strings.ToLower(name), lower) ||
+			(preset != nil && strings.Contains(strings.ToLower(preset.Description), lower))
+	})
+	m.filteredPresets = result.Items
+	m.presetCursor = result.Cursor
 }
 
 // getSelectedCount returns the number of selected servers
@@ -959,10 +939,10 @@ func (m Model) viewConfiguring() string {
 		var displayValue string
 		if i == m.currentField {
 			// Show current input with cursor
-			displayValue = m.renderInputWithCursor(key)
+			displayValue = components.RenderInputWithCursor(m.textInput, m.cursorPos, key, selectedStyle.Render)
 		} else if val, ok := m.envValues[key]; ok && val != "" {
 			// Show saved value (masked if secret)
-			if m.isSecretField(key) {
+			if envpkg.IsSecret(key) {
 				displayValue = strings.Repeat("*", len(val))
 			} else {
 				displayValue = val
@@ -996,36 +976,6 @@ func (m Model) viewConfiguring() string {
 	}
 
 	return s.String()
-}
-
-// renderInputWithCursor renders the input field with a visible cursor
-func (m Model) renderInputWithCursor(key string) string {
-	if m.isSecretField(key) {
-		// For secret fields, show asterisks with cursor
-		masked := strings.Repeat("*", len(m.textInput))
-		if m.cursorPos < len(masked) {
-			return masked[:m.cursorPos] + selectedStyle.Render("_") + masked[m.cursorPos:]
-		}
-		return masked + selectedStyle.Render("_")
-	}
-
-	// For normal fields, show text with cursor
-	if m.cursorPos < len(m.textInput) {
-		return m.textInput[:m.cursorPos] + selectedStyle.Render(string(m.textInput[m.cursorPos])) + m.textInput[m.cursorPos+1:]
-	}
-	return m.textInput + selectedStyle.Render("_")
-}
-
-// isSecretField checks if a field name indicates it should be masked
-func (m Model) isSecretField(key string) bool {
-	keyUpper := strings.ToUpper(key)
-	secretKeywords := []string{"TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL", "API_KEY"}
-	for _, keyword := range secretKeywords {
-		if strings.Contains(keyUpper, keyword) {
-			return true
-		}
-	}
-	return false
 }
 
 // viewInstalling renders the installing state

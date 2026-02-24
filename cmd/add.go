@@ -69,15 +69,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// NO ARGS: Launch fuzzy select TUI
 	if len(args) == 0 {
 		// Determine scope
-		scope := addScope
-		if scope == "" {
-			if cfg.DefaultScope != "" {
-				scope = cfg.DefaultScope
-			} else {
-				scope = "local"
-			}
-		}
-		parsedScope, err := adapter.ParseScope(scope)
+		parsedScope, err := adapter.ParseScope(resolveScope(addScope, cfg))
 		if err != nil {
 			return err
 		}
@@ -111,15 +103,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 
 		// Determine scope
-		scope := addScope
-		if scope == "" {
-			if cfg.DefaultScope != "" {
-				scope = cfg.DefaultScope
-			} else {
-				scope = "local"
-			}
-		}
-		parsedScope, err := adapter.ParseScope(scope)
+		parsedScope, err := adapter.ParseScope(resolveScope(addScope, cfg))
 		if err != nil {
 			return err
 		}
@@ -223,18 +207,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine scope
-	scope := addScope
-	if scope == "" {
-		// Use default from config, or fallback to "local"
-		if cfg.DefaultScope != "" {
-			scope = cfg.DefaultScope
-		} else {
-			scope = "local"
-		}
-	}
-
-	// Parse scope
-	parsedScope, err := adapter.ParseScope(scope)
+	parsedScope, err := adapter.ParseScope(resolveScope(addScope, cfg))
 	if err != nil {
 		return err
 	}

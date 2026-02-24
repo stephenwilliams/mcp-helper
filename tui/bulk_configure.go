@@ -8,6 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
+	envpkg "github.com/stephenwilliams/mcp-helper/internal/env"
+	"github.com/stephenwilliams/mcp-helper/tui/components"
 )
 
 // bulkInstallCompleteMsg is sent when a single server installation completes
@@ -334,10 +336,10 @@ func (m BulkConfigureModel) viewConfiguring() string {
 		var displayValue string
 		if i == m.currentField {
 			// Show current input with cursor
-			displayValue = m.renderInputWithCursor(key)
+			displayValue = components.RenderInputWithCursor(m.textInput, m.cursorPos, key, selectedStyle.Render)
 		} else if val, ok := m.envValues[key]; ok && val != "" {
 			// Show saved value (masked if secret)
-			if isSecretField(key) {
+			if envpkg.IsSecret(key) {
 				displayValue = strings.Repeat("*", len(val))
 			} else {
 				displayValue = val
@@ -494,24 +496,6 @@ func (m BulkConfigureModel) viewComplete() string {
 	return s.String()
 }
 
-// renderInputWithCursor renders the input field with a visible cursor
-func (m BulkConfigureModel) renderInputWithCursor(key string) string {
-	if isSecretField(key) {
-		// For secret fields, show asterisks with cursor
-		masked := strings.Repeat("*", len(m.textInput))
-		if m.cursorPos < len(masked) {
-			return masked[:m.cursorPos] + selectedStyle.Render("_") + masked[m.cursorPos:]
-		}
-		return masked + selectedStyle.Render("_")
-	}
-
-	// For normal fields, show text with cursor
-	if m.cursorPos < len(m.textInput) {
-		return m.textInput[:m.cursorPos] + selectedStyle.Render(string(m.textInput[m.cursorPos])) + m.textInput[m.cursorPos+1:]
-	}
-	return m.textInput + selectedStyle.Render("_")
-}
-
 // installCurrentServer creates a command that installs the current server
 func (m BulkConfigureModel) installCurrentServer() tea.Cmd {
 	serverName := m.servers[m.currentIndex]
@@ -533,14 +517,3 @@ func (m BulkConfigureModel) installCurrentServer() tea.Cmd {
 	}
 }
 
-// isSecretField checks if a field name indicates it should be masked
-func isSecretField(key string) bool {
-	keyUpper := strings.ToUpper(key)
-	secretKeywords := []string{"TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL"}
-	for _, keyword := range secretKeywords {
-		if strings.Contains(keyUpper, keyword) {
-			return true
-		}
-	}
-	return false
-}

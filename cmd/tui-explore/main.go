@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
+	"github.com/stephenwilliams/mcp-helper/internal/adapter/mock"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
 	"github.com/stephenwilliams/mcp-helper/internal/tuiharness"
 	"github.com/stephenwilliams/mcp-helper/tui"
@@ -210,9 +211,9 @@ func runExploration() error {
 
 func createModelFactory() tuiharness.ModelFactory {
 	cfg := loadConfig()
-	mock := &mockAdapter{existingServers: map[string]bool{}}
+	a := mock.New()
 	return func() tea.Model {
-		return tui.NewModelWithOptions(cfg, mock, adapter.ScopeUser, true)
+		return tui.NewModelWithOptions(cfg, a, adapter.ScopeUser, true)
 	}
 }
 
@@ -227,74 +228,5 @@ func loadConfig() *config.Config {
 	}
 
 	// Default test config
-	return &config.Config{
-		Servers: map[string]*config.Server{
-			"server-alpha": {
-				Description: "Alpha server for testing",
-				Transport:   "stdio",
-				Command:     "alpha-server",
-			},
-			"server-beta": {
-				Description: "Beta server with environment variables",
-				Transport:   "stdio",
-				Command:     "beta-server",
-				Env: map[string]config.EnvVar{
-					"API_KEY": {
-						Description: "API key for beta server",
-						Required:    true,
-					},
-				},
-			},
-			"server-gamma": {
-				Description: "Gamma HTTP server",
-				Transport:   "http",
-				URL:         "http://localhost:8080",
-			},
-			"server-delta": {
-				Description: "Delta server",
-				Transport:   "stdio",
-				Command:     "delta-server",
-			},
-			"server-epsilon": {
-				Description: "Epsilon server",
-				Transport:   "stdio",
-				Command:     "epsilon-server",
-			},
-		},
-		Presets: map[string]*config.Preset{
-			"basic": {
-				Description: "Basic preset with alpha and gamma",
-				Servers:     []string{"server-alpha", "server-gamma"},
-			},
-			"full": {
-				Description: "All servers",
-				Servers:     []string{"server-alpha", "server-beta", "server-gamma", "server-delta", "server-epsilon"},
-			},
-		},
-	}
-}
-
-// mockAdapter implements adapter.Adapter for testing
-type mockAdapter struct {
-	existingServers map[string]bool
-}
-
-func (m *mockAdapter) Name() string {
-	return "mock"
-}
-
-func (m *mockAdapter) AddServer(name string, server *config.Server, scope adapter.Scope, env map[string]string) error {
-	return nil
-}
-
-func (m *mockAdapter) DryRun(name string, server *config.Server, scope adapter.Scope, env map[string]string) string {
-	return ""
-}
-
-func (m *mockAdapter) GetConfigPath(scope adapter.Scope) string {
-	return ""
-}
-
-func (m *mockAdapter) ServerExists(name string, scope adapter.Scope) bool {
-	return m.existingServers[name]
+	return mock.DefaultTestConfig()
 }
