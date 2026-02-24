@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
 )
@@ -44,10 +45,22 @@ type Model struct {
 	installMsg    string   // installation status message
 	width         int
 	height        int
+
+	// Multi-select mode fields
+	multiSelectMode  bool              // whether multi-select is enabled
+	multiSelect      map[string]bool   // tracks selected servers
+	filterText       string            // current filter text
+	filteredServers  []string          // servers matching filter
+	filtering        bool              // whether in filter input mode
 }
 
 // NewModel creates a new TUI model
 func NewModel(cfg *config.Config, adptr adapter.Adapter) Model {
+	return NewModelWithOptions(cfg, adptr, adapter.ScopeUser, false)
+}
+
+// NewModelWithOptions creates a new TUI model with options
+func NewModelWithOptions(cfg *config.Config, adptr adapter.Adapter, scope adapter.Scope, multiSelect bool) Model {
 	// Extract and sort server names
 	servers := make([]string, 0, len(cfg.Servers))
 	for name := range cfg.Servers {
@@ -55,15 +68,65 @@ func NewModel(cfg *config.Config, adptr adapter.Adapter) Model {
 	}
 	sort.Strings(servers)
 
-	return Model{
-		state:     StateBrowsing,
-		config:    cfg,
-		adapter:   adptr,
-		servers:   servers,
-		cursor:    0,
-		envValues: make(map[string]string),
-		scope:     adapter.ScopeUser, // default scope
+	m := Model{
+		state:           StateBrowsing,
+		config:          cfg,
+		adapter:         adptr,
+		servers:         servers,
+		cursor:          0,
+		envValues:       make(map[string]string),
+		scope:           scope,
+		multiSelectMode: multiSelect,
+		multiSelect:     make(map[string]bool),
+		filteredServers: servers, // Initially show all
 	}
+
+	return m
+}
+
+// updateFilter filters the server list based on filterText
+func (m *Model) updateFilter() {
+	if m.filterText == "" {
+		m.filteredServers = m.servers
+		return
+	}
+	m.filteredServers = nil
+	lower := strings.ToLower(m.filterText)
+	for _, name := range m.servers {
+		server := m.config.Servers[name]
+		// Match against name or description
+		if strings.Contains(strings.ToLower(name), lower) ||
+			(server != nil && strings.Contains(strings.ToLower(server.Description), lower)) {
+			m.filteredServers = append(m.filteredServers, name)
+		}
+	}
+	// Reset cursor if it's out of bounds
+	if m.cursor >= len(m.filteredServers) {
+		m.cursor = 0
+	}
+}
+
+// getSelectedCount returns the number of selected servers
+func (m Model) getSelectedCount() int {
+	count := 0
+	for _, selected := range m.multiSelect {
+		if selected {
+			count++
+		}
+	}
+	return count
+}
+
+// getSelectedServers returns a sorted list of selected server names
+func (m Model) getSelectedServers() []string {
+	var selected []string
+	for name, isSelected := range m.multiSelect {
+		if isSelected {
+			selected = append(selected, name)
+		}
+	}
+	sort.Strings(selected)
+	return selected
 }
 
 // Init initializes the model
@@ -108,8 +171,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // updateBrowsing handles input in the browsing state
 func (m Model) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Get the list to navigate (filtered or all)
+	serverList := m.servers
+	if m.multiSelectMode {
+		serverList = m.filteredServers
+	}
+
+	// Handle filter input mode
+	if m.filtering {
+		switch msg.String() {
+		case "esc":
+			m.filtering = false
+			m.filterText = ""
+			m.updateFilter()
+		case "enter":
+			m.filtering = false
+		case "backspace":
+			if len(m.filterText) > 0 {
+				m.filterText = m.filterText[:len(m.filterText)-1]
+				m.updateFilter()
+			}
+		default:
+			if len(msg.String()) == 1 && msg.String() != " " {
+				m.filterText += msg.String()
+				m.updateFilter()
+			}
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
+		return m, tea.Quit
+
+	case "esc":
+		if m.multiSelectMode && m.filterText != "" {
+			m.filterText = ""
+			m.updateFilter()
+			return m, nil
+		}
 		return m, tea.Quit
 
 	case "up", "k":
@@ -118,14 +218,47 @@ func (m Model) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "down", "j":
-		if m.cursor < len(m.servers)-1 {
+		if m.cursor < len(serverList)-1 {
 			m.cursor++
 		}
 
+	case " ":
+		// Toggle selection in multi-select mode
+		if m.multiSelectMode && len(serverList) > 0 && m.cursor < len(serverList) {
+			name := serverList[m.cursor]
+			m.multiSelect[name] = !m.multiSelect[name]
+		}
+
+	case "/":
+		// Enter filter mode
+		if m.multiSelectMode {
+			m.filtering = true
+		}
+
 	case "enter":
-		if len(m.servers) > 0 {
-			m.selected = m.servers[m.cursor]
+		if m.multiSelectMode {
+			// In multi-select mode, proceed with selected servers
+			selectedServers := m.getSelectedServers()
+			if len(selectedServers) > 0 {
+				// Transition to BulkConfigureModel
+				bulkModel := NewBulkConfigureModel(selectedServers, m.config, m.adapter, m.scope)
+				return bulkModel, bulkModel.Init()
+			}
+			// No selection - do nothing or show message
+			return m, nil
+		}
+		// Single-select mode - go to details
+		if len(serverList) > 0 && m.cursor < len(serverList) {
+			m.selected = serverList[m.cursor]
 			m.state = StateDetails
+		}
+
+	default:
+		// In multi-select mode, typing starts filter
+		if m.multiSelectMode && len(msg.String()) == 1 {
+			m.filtering = true
+			m.filterText = msg.String()
+			m.updateFilter()
 		}
 	}
 
@@ -284,30 +417,56 @@ func (m Model) View() string {
 // viewBrowsing renders the browsing state
 func (m Model) viewBrowsing() string {
 	var s strings.Builder
-	s.WriteString(titleStyle.Render("MCP Server Browser") + "\n\n")
 
-	if len(m.servers) == 0 {
-		s.WriteString(errorStyle.Render("No servers found in registry") + "\n")
+	// Title
+	if m.multiSelectMode {
+		s.WriteString(titleStyle.Render("Select MCP Servers") + "\n")
+	} else {
+		s.WriteString(titleStyle.Render("MCP Server Browser") + "\n")
+	}
+
+	// Filter bar (in multi-select mode)
+	if m.multiSelectMode {
+		if m.filtering {
+			s.WriteString(labelStyle.Render("Filter: ") + valueStyle.Render(m.filterText) + selectedStyle.Render("_") + "\n")
+		} else if m.filterText != "" {
+			s.WriteString(labelStyle.Render("Filter: ") + valueStyle.Render(m.filterText) + "\n")
+		}
+	}
+	s.WriteString("\n")
+
+	// Get the list to display
+	serverList := m.servers
+	if m.multiSelectMode {
+		serverList = m.filteredServers
+	}
+
+	if len(serverList) == 0 {
+		if m.filterText != "" {
+			s.WriteString(errorStyle.Render("No servers match filter") + "\n")
+		} else {
+			s.WriteString(errorStyle.Render("No servers found in registry") + "\n")
+		}
 	} else {
 		// Calculate visible range for scrolling
-		visibleHeight := m.height - 6 // Account for title, help text, and margins
+		visibleHeight := m.height - 8 // Account for title, help text, filter, status
 		if visibleHeight < 1 {
 			visibleHeight = 10 // Default minimum
 		}
 
 		start := 0
-		end := len(m.servers)
+		end := len(serverList)
 
 		// Implement scrolling if list is longer than screen
-		if len(m.servers) > visibleHeight {
+		if len(serverList) > visibleHeight {
 			// Keep cursor centered when possible
 			start = m.cursor - visibleHeight/2
 			if start < 0 {
 				start = 0
 			}
 			end = start + visibleHeight
-			if end > len(m.servers) {
-				end = len(m.servers)
+			if end > len(serverList) {
+				end = len(serverList)
 				start = end - visibleHeight
 				if start < 0 {
 					start = 0
@@ -317,18 +476,25 @@ func (m Model) viewBrowsing() string {
 
 		// Render visible servers
 		for i := start; i < end; i++ {
-			name := m.servers[i]
+			name := serverList[i]
 			server := m.config.Servers[name]
+			isCursor := i == m.cursor
 
-			var cursor string
-			if i == m.cursor {
+			// Cursor indicator
+			cursor := "  "
+			if isCursor {
 				cursor = "► "
-			} else {
-				cursor = "  "
 			}
 
-			// Server name (prominent)
-			serverName := cursor + name
+			// Checkbox (multi-select mode only)
+			checkbox := ""
+			if m.multiSelectMode {
+				if m.multiSelect[name] {
+					checkbox = checkboxCheckedStyle.Render("[✓]") + " "
+				} else {
+					checkbox = checkboxUncheckedStyle.Render("[ ]") + " "
+				}
+			}
 
 			// Transport indicator
 			var transportBadge string
@@ -345,38 +511,69 @@ func (m Model) viewBrowsing() string {
 			description := server.Description
 			maxDescLen := 60
 			if m.width > 0 && m.width < 80 {
-				maxDescLen = m.width - 25 // Adjust for smaller screens
+				maxDescLen = m.width - 30
 			}
 			if len(description) > maxDescLen {
 				description = description[:maxDescLen-3] + "..."
 			}
 
-			// Build the server line
-			if i == m.cursor {
-				s.WriteString(selectedStyle.Render(serverName) + " " + transportBadge + "\n")
+			// Build the line without style padding - control alignment manually
+			if isCursor {
+				// Highlighted row
+				s.WriteString(cursor)
+				s.WriteString(checkbox)
+				s.WriteString(labelStyle.Render(name) + " ")
+				s.WriteString(transportBadge)
+				s.WriteString("\n")
 				if description != "" {
-					s.WriteString(descriptionStyle.Render("    " + description) + "\n")
+					indent := "  "
+					if m.multiSelectMode {
+						indent = "      " // account for cursor + checkbox
+					}
+					s.WriteString(valueStyle.Render(indent+description) + "\n")
 				}
 			} else {
-				s.WriteString(normalStyle.Render(serverName) + " " + transportBadge + "\n")
+				// Normal row
+				s.WriteString(cursor)
+				s.WriteString(checkbox)
+				s.WriteString(name + " ")
+				s.WriteString(transportBadge)
+				s.WriteString("\n")
 				if description != "" {
-					s.WriteString(descriptionDimStyle.Render("    " + description) + "\n")
+					indent := "  "
+					if m.multiSelectMode {
+						indent = "      " // account for cursor + checkbox
+					}
+					// Use simple gray color without padding
+					dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+					s.WriteString(dimStyle.Render(indent+description) + "\n")
 				}
 			}
 		}
 
 		// Show scroll indicator if needed
-		if len(m.servers) > visibleHeight {
-			s.WriteString("\n" + infoStyle.Render("  Showing "+
-				string(rune('0'+(start+1)/10))+string(rune('0'+(start+1)%10))+
-				"-"+
-				string(rune('0'+end/10))+string(rune('0'+end%10))+
-				" of "+
-				string(rune('0'+len(m.servers)/10))+string(rune('0'+len(m.servers)%10))))
+		if len(serverList) > visibleHeight {
+			s.WriteString("\n" + infoStyle.Render(fmt.Sprintf("  Showing %d-%d of %d", start+1, end, len(serverList))))
 		}
 	}
 
-	s.WriteString("\n" + helpStyle.Render("↑/k: up • ↓/j: down • enter: select • q: quit"))
+	// Status bar (multi-select mode)
+	if m.multiSelectMode {
+		selectedCount := m.getSelectedCount()
+		s.WriteString("\n" + selectedCountStyle.Render(fmt.Sprintf("Selected: %d", selectedCount)))
+	}
+
+	// Help text
+	s.WriteString("\n")
+	if m.multiSelectMode {
+		if m.filtering {
+			s.WriteString(helpStyle.Render("Type to filter • Enter: done • Esc: clear filter"))
+		} else {
+			s.WriteString(helpStyle.Render("↑/↓: navigate • Space: toggle • Enter: install selected • Type: filter • Esc: quit"))
+		}
+	} else {
+		s.WriteString(helpStyle.Render("↑/k: up • ↓/j: down • enter: select • q: quit"))
+	}
 
 	return s.String()
 }

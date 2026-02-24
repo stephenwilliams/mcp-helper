@@ -80,4 +80,26 @@ var (
 	descriptionDimStyle = lipgloss.NewStyle().
 				Foreground(colorGray).
 				PaddingLeft(4)
+
+	// Checkbox styles for multi-select
+	checkboxCheckedStyle = lipgloss.NewStyle().
+				Foreground(colorGreen).
+				Bold(true)
+
+	checkboxUncheckedStyle = lipgloss.NewStyle().
+				Foreground(colorGray)
+
+	selectedCountStyle = lipgloss.NewStyle().
+				Foreground(colorCyan).
+				Bold(true)
+
+	bulkProgressStyle = lipgloss.NewStyle().
+				Foreground(colorYellow).
+				Bold(true)
+
+	resultSuccessStyle = lipgloss.NewStyle().
+				Foreground(colorGreen)
+
+	resultFailureStyle = lipgloss.NewStyle().
+				Foreground(colorRed)
 )

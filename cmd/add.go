@@ -8,6 +8,7 @@ import (
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
 	"github.com/stephenwilliams/mcp-helper/internal/env"
 	"github.com/stephenwilliams/mcp-helper/internal/template"
+	"github.com/stephenwilliams/mcp-helper/tui"
 )
 
 var (
@@ -40,7 +41,7 @@ Examples:
 
   # Fail if env vars are missing (no prompts)
   mcp-helper add github --no-prompt`,
-	Args:              cobra.ExactArgs(1),
+	Args:              cobra.MaximumNArgs(1),
 	ValidArgsFunction: ServerNameCompletion,
 	RunE:              runAdd,
 }
@@ -58,13 +59,47 @@ func init() {
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
-	serverName := args[0]
-
-	// Get configuration
+	// Get configuration first (needed for both paths)
 	cfg := GetConfig()
 	if cfg == nil {
 		return fmt.Errorf("no configuration file found")
 	}
+
+	// NO ARGS: Launch fuzzy select TUI
+	if len(args) == 0 {
+		// Determine scope
+		scope := addScope
+		if scope == "" {
+			if cfg.DefaultScope != "" {
+				scope = cfg.DefaultScope
+			} else {
+				scope = "local"
+			}
+		}
+		parsedScope, err := adapter.ParseScope(scope)
+		if err != nil {
+			return err
+		}
+
+		// Get adapter
+		adptr, err := GetAdapter()
+		if err != nil {
+			return err
+		}
+
+		// Launch TUI (handles everything including installation)
+		installed, err := tui.RunFuzzySelect(cfg, adptr, parsedScope)
+		if err != nil {
+			return err
+		}
+		if len(installed) == 0 {
+			fmt.Println("No servers installed.")
+		}
+		return nil
+	}
+
+	// SINGLE ARG: Existing flow
+	serverName := args[0]
 
 	// Find server in config
 	server, exists := cfg.Servers[serverName]
