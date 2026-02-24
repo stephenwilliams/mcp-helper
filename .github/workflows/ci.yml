@@ -19,9 +19,10 @@ jobs:
           go-version: "1.25"
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: v2.0.2
+          install-mode: goinstall
           # Only report new issues on PRs (don't fail on pre-existing issues)
           only-new-issues: true
 
