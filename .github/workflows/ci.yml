@@ -22,6 +22,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          install-mode: goinstall
           # Only report new issues on PRs (don't fail on pre-existing issues)
           only-new-issues: true
 
