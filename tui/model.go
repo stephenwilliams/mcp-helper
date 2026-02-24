@@ -242,20 +242,27 @@ func (m Model) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.filtering = false
 			m.filterText = ""
 			m.updateFilter()
+			return m, nil
 		case "enter":
 			m.filtering = false
+			return m, nil
 		case "backspace":
 			if len(m.filterText) > 0 {
 				m.filterText = m.filterText[:len(m.filterText)-1]
 				m.updateFilter()
 			}
+			return m, nil
+		case "up", "down", "k", "j", "tab", " ":
+			// Exit filter mode and let these keys be handled by navigation below
+			m.filtering = false
+			// Don't return - fall through to handle the key
 		default:
 			if len(msg.String()) == 1 && msg.String() != " " {
 				m.filterText += msg.String()
 				m.updateFilter()
 			}
+			return m, nil
 		}
-		return m, nil
 	}
 
 	switch msg.String() {
@@ -301,6 +308,62 @@ func (m Model) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			if m.presetCursor < len(m.filteredPresets)-1 {
 				m.presetCursor++
+			}
+		}
+
+	case "pgup":
+		// Move cursor up by page (10 items)
+		pageSize := 10
+		if m.activeTab == 0 {
+			m.cursor -= pageSize
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+		} else {
+			m.presetCursor -= pageSize
+			if m.presetCursor < 0 {
+				m.presetCursor = 0
+			}
+		}
+
+	case "pgdown":
+		// Move cursor down by page (10 items)
+		pageSize := 10
+		if m.activeTab == 0 {
+			m.cursor += pageSize
+			if m.cursor >= len(serverList) {
+				m.cursor = len(serverList) - 1
+			}
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+		} else {
+			m.presetCursor += pageSize
+			if m.presetCursor >= len(m.filteredPresets) {
+				m.presetCursor = len(m.filteredPresets) - 1
+			}
+			if m.presetCursor < 0 {
+				m.presetCursor = 0
+			}
+		}
+
+	case "home":
+		// Move cursor to first item
+		if m.activeTab == 0 {
+			m.cursor = 0
+		} else {
+			m.presetCursor = 0
+		}
+
+	case "end":
+		// Move cursor to last item
+		if m.activeTab == 0 {
+			if len(serverList) > 0 {
+				m.cursor = len(serverList) - 1
+			}
+		} else {
+			if len(m.filteredPresets) > 0 {
+				m.presetCursor = len(m.filteredPresets) - 1
 			}
 		}
 
