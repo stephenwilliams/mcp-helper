@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stephenwilliams/mcp-helper/internal/mcp"
 	"github.com/stephenwilliams/mcp-helper/internal/permissions"
+	"github.com/stephenwilliams/mcp-helper/tui/components"
 )
 
 // ToolsApproveState represents the current state of the tools approve TUI
@@ -51,7 +52,7 @@ type ToolsApproveModel struct {
 	mcpClient     *mcp.Client
 	servers       []mcp.ServerInfo
 	cursor        int
-	viewportStart int                          // First visible row for scrolling
+	viewport      *components.ViewportManager // Viewport for scrolling
 	expanded      map[string]bool              // server name -> expanded
 	selected      map[string]SelectType        // server -> none/some/all(wildcard)
 	selectedTools map[string]map[string]bool   // server -> tool -> selected
@@ -82,6 +83,7 @@ func NewToolsApproveModel(adapter permissions.Adapter, dryRun bool, targetFile s
 		state:         ToolsStateDiscovering,
 		adapter:       adapter,
 		mcpClient:     mcp.NewClient(mcp.DefaultTimeout, mcp.NewCache(mcp.DefaultCacheTTL)),
+		viewport:      components.NewViewportManager(7, 10), // 7 reserved lines, 10 minimum height
 		expanded:      make(map[string]bool),
 		selected:      make(map[string]SelectType),
 		selectedTools: make(map[string]map[string]bool),
@@ -121,6 +123,7 @@ func (m ToolsApproveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.viewport.SetTerminalHeight(msg.Height)
 
 	case spinner.TickMsg:
 		if m.state == ToolsStateDiscovering || m.state == ToolsStateApplying {
@@ -420,13 +423,13 @@ func (m ToolsApproveModel) viewSelectTools() string {
 		s.WriteString(errorStyle.Render("No MCP servers configured") + "\n")
 	} else {
 		viewportHeight := m.getViewportHeight()
-		viewportEnd := m.viewportStart + viewportHeight
+		viewportEnd := m.viewport.Start + viewportHeight
 		currentRow := 0
 		renderedRows := 0
 
 		for _, srv := range m.servers {
 			// Server row
-			if currentRow >= m.viewportStart && currentRow < viewportEnd {
+			if currentRow >= m.viewport.Start && currentRow < viewportEnd {
 				cursor := "  "
 				if currentRow == m.cursor {
 					cursor = "► "
@@ -484,7 +487,7 @@ func (m ToolsApproveModel) viewSelectTools() string {
 			// Tool rows (if expanded and no error)
 			if m.expanded[srv.Name] && srv.Error == nil {
 				for _, tool := range srv.Tools {
-					if currentRow >= m.viewportStart && currentRow < viewportEnd {
+					if currentRow >= m.viewport.Start && currentRow < viewportEnd {
 						toolCursor := "  "
 						if currentRow == m.cursor {
 							toolCursor = "► "
@@ -546,8 +549,8 @@ func (m ToolsApproveModel) viewSelectTools() string {
 
 		// Show scroll indicators
 		totalRows := m.getMaxCursor() + 1
-		if m.viewportStart > 0 {
-			s.WriteString(infoStyle.Render(fmt.Sprintf("  ↑ %d more above", m.viewportStart)) + "\n")
+		if m.viewport.Start > 0 {
+			s.WriteString(infoStyle.Render(fmt.Sprintf("  ↑ %d more above", m.viewport.Start)) + "\n")
 		}
 		if viewportEnd < totalRows {
 			s.WriteString(infoStyle.Render(fmt.Sprintf("  ↓ %d more below", totalRows-viewportEnd)) + "\n")
@@ -731,32 +734,12 @@ func (m *ToolsApproveModel) getMaxCursor() int {
 
 // getViewportHeight returns the number of rows available for the list
 func (m *ToolsApproveModel) getViewportHeight() int {
-	// Reserve lines for: title, instruction, blank line, status line, blank line, help line
-	reserved := 7
-	if m.height <= reserved {
-		return 10 // Minimum viewport
-	}
-	return m.height - reserved
+	return m.viewport.GetViewportHeight()
 }
 
 // adjustViewport ensures the cursor is visible within the viewport
 func (m *ToolsApproveModel) adjustViewport() {
-	viewportHeight := m.getViewportHeight()
-
-	// Scroll up if cursor is above viewport
-	if m.cursor < m.viewportStart {
-		m.viewportStart = m.cursor
-	}
-
-	// Scroll down if cursor is below viewport
-	if m.cursor >= m.viewportStart+viewportHeight {
-		m.viewportStart = m.cursor - viewportHeight + 1
-	}
-
-	// Ensure viewportStart is not negative
-	if m.viewportStart < 0 {
-		m.viewportStart = 0
-	}
+	m.viewport.AdjustForCursor(m.cursor, m.getMaxCursor()+1)
 }
 
 func (m *ToolsApproveModel) cursorToServerAndTool() (serverIdx, toolIdx int) {

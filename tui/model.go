@@ -2,17 +2,14 @@ package tui
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
 	"github.com/stephenwilliams/mcp-helper/internal/app"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
-	envpkg "github.com/stephenwilliams/mcp-helper/internal/env"
-	"github.com/stephenwilliams/mcp-helper/tui/components"
+	"github.com/stephenwilliams/mcp-helper/tui/states"
 )
 
 // State represents the current state of the TUI
@@ -64,6 +61,12 @@ type Model struct {
 	presets         []string // available preset names (filtered for availability)
 	filteredPresets []string // filtered preset names (from filterText)
 	presetCursor    int      // cursor position in presets tab
+
+	// State handlers
+	browsingHandler    *states.BrowsingHandler
+	detailsHandler     *states.DetailsHandler
+	configuringHandler *states.ConfiguringHandler
+	installingHandler  *states.InstallingHandler
 }
 
 // NewModel creates a new TUI model
@@ -92,6 +95,27 @@ func NewModelWithInstaller(cfg *config.Config, adptr adapter.Adapter, installer 
 
 	allInstalled := len(cfg.Servers) > 0 && len(servers) == 0
 
+	// Initialize styles for state handlers
+	stylesConfig := states.Styles{
+		Title:             titleStyle,
+		Selected:          selectedStyle,
+		Normal:            normalStyle,
+		Help:              helpStyle,
+		Error:             errorStyle,
+		Success:           successStyle,
+		Info:              infoStyle,
+		Label:             labelStyle,
+		Value:             valueStyle,
+		TransportStdio:    transportStdioStyle,
+		TransportHTTP:     transportHTTPStyle,
+		TransportUnknown:  transportUnknownStyle,
+		CheckboxChecked:   checkboxCheckedStyle,
+		CheckboxUnchecked: checkboxUncheckedStyle,
+		SelectedCount:     selectedCountStyle,
+		TabActive:         tabActiveStyle,
+		TabInactive:       tabInactiveStyle,
+	}
+
 	m := Model{
 		state:           StateBrowsing,
 		config:          cfg,
@@ -105,6 +129,12 @@ func NewModelWithInstaller(cfg *config.Config, adptr adapter.Adapter, installer 
 		multiSelect:     make(map[string]bool),
 		filteredServers: servers, // Initially show all
 		allInstalled:    allInstalled,
+
+		// Initialize state handlers
+		browsingHandler:    states.NewBrowsingHandler(stylesConfig),
+		detailsHandler:     states.NewDetailsHandler(stylesConfig),
+		configuringHandler: states.NewConfiguringHandler(stylesConfig),
+		installingHandler:  states.NewInstallingHandler(stylesConfig),
 	}
 
 	// Initialize presets for multi-select mode
@@ -155,28 +185,6 @@ func (m *Model) updatePresetFilter() {
 	m.presetCursor = result.Cursor
 }
 
-// getSelectedCount returns the number of selected servers
-func (m Model) getSelectedCount() int {
-	count := 0
-	for _, selected := range m.multiSelect {
-		if selected {
-			count++
-		}
-	}
-	return count
-}
-
-// getSelectedServers returns a sorted list of selected server names
-func (m Model) getSelectedServers() []string {
-	var selected []string
-	for name, isSelected := range m.multiSelect {
-		if isSelected {
-			selected = append(selected, name)
-		}
-	}
-	sort.Strings(selected)
-	return selected
-}
 
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
@@ -220,218 +228,46 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // updateBrowsing handles input in the browsing state
 func (m Model) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Get the list to navigate (filtered or all)
-	serverList := m.servers
-	if m.multiSelectMode {
-		serverList = m.filteredServers
+	params := states.BrowsingUpdateParams{
+		Msg:             msg,
+		Cursor:          m.cursor,
+		PresetCursor:    m.presetCursor,
+		Filtering:       m.filtering,
+		FilterText:      m.filterText,
+		MultiSelectMode: m.multiSelectMode,
+		ActiveTab:       m.activeTab,
+		Servers:         m.servers,
+		FilteredServers: m.filteredServers,
+		FilteredPresets: m.filteredPresets,
+		MultiSelect:     m.multiSelect,
+		Config:  m.config,
+		Adapter: m.adapter,
+		Scope:   m.scope,
 	}
 
-	// Handle filter input mode
-	if m.filtering {
-		switch msg.String() {
-		case "esc":
-			m.filtering = false
-			m.filterText = ""
-			m.updateFilter()
-			return m, nil
-		case "enter":
-			m.filtering = false
-			return m, nil
-		case "backspace":
-			if len(m.filterText) > 0 {
-				m.filterText = m.filterText[:len(m.filterText)-1]
-				m.updateFilter()
-			}
-			return m, nil
-		case "up", "down", "k", "j", "tab", " ":
-			// Exit filter mode and let these keys be handled by navigation below
-			m.filtering = false
-			// Don't return - fall through to handle the key
-		default:
-			if len(msg.String()) == 1 && msg.String() != " " {
-				m.filterText += msg.String()
-				m.updateFilter()
-			}
-			return m, nil
-		}
+	result := m.browsingHandler.Update(params, m.updateFilter, m.updatePresetFilter)
+
+	// Update model state from result
+	m.cursor = result.Cursor
+	m.presetCursor = result.PresetCursor
+	m.filtering = result.Filtering
+	m.filterText = result.FilterText
+	m.activeTab = result.ActiveTab
+	m.filteredServers = result.FilteredServers
+	m.filteredPresets = result.FilteredPresets
+	m.multiSelect = result.MultiSelect
+
+	if result.ShouldQuit {
+		return m, tea.Quit
 	}
 
-	switch msg.String() {
-	case "q", "ctrl+c":
-		return m, tea.Quit
-
-	case "esc":
-		if m.multiSelectMode && m.filterText != "" {
-			m.filterText = ""
-			m.updateFilter()
-			m.updatePresetFilter()
-			return m, nil
-		}
-		return m, tea.Quit
-
-	case "tab":
-		// Switch tabs (only in multi-select mode)
-		if m.multiSelectMode {
-			m.activeTab = (m.activeTab + 1) % 2
-			// Clear filter on tab switch
-			m.filterText = ""
-			m.filtering = false
-			m.updateFilter()
-			m.updatePresetFilter()
-		}
-
-	case "up", "k":
-		if m.activeTab == 0 {
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		} else {
-			if m.presetCursor > 0 {
-				m.presetCursor--
-			}
-		}
-
-	case "down", "j":
-		if m.activeTab == 0 {
-			if m.cursor < len(serverList)-1 {
-				m.cursor++
-			}
-		} else {
-			if m.presetCursor < len(m.filteredPresets)-1 {
-				m.presetCursor++
-			}
-		}
-
-	case "pgup":
-		// Move cursor up by page (10 items)
-		pageSize := 10
-		if m.activeTab == 0 {
-			m.cursor -= pageSize
-			if m.cursor < 0 {
-				m.cursor = 0
-			}
-		} else {
-			m.presetCursor -= pageSize
-			if m.presetCursor < 0 {
-				m.presetCursor = 0
-			}
-		}
-
-	case "pgdown":
-		// Move cursor down by page (10 items)
-		pageSize := 10
-		if m.activeTab == 0 {
-			m.cursor += pageSize
-			if m.cursor >= len(serverList) {
-				m.cursor = len(serverList) - 1
-			}
-			if m.cursor < 0 {
-				m.cursor = 0
-			}
-		} else {
-			m.presetCursor += pageSize
-			if m.presetCursor >= len(m.filteredPresets) {
-				m.presetCursor = len(m.filteredPresets) - 1
-			}
-			if m.presetCursor < 0 {
-				m.presetCursor = 0
-			}
-		}
-
-	case "home":
-		// Move cursor to first item
-		if m.activeTab == 0 {
-			m.cursor = 0
-		} else {
-			m.presetCursor = 0
-		}
-
-	case "end":
-		// Move cursor to last item
-		if m.activeTab == 0 {
-			if len(serverList) > 0 {
-				m.cursor = len(serverList) - 1
-			}
-		} else {
-			if len(m.filteredPresets) > 0 {
-				m.presetCursor = len(m.filteredPresets) - 1
-			}
-		}
-
-	case " ":
-		// Toggle selection in multi-select mode
-		if m.multiSelectMode {
-			if m.activeTab == 0 {
-				// Servers tab
-				if len(serverList) > 0 && m.cursor < len(serverList) {
-					name := serverList[m.cursor]
-					m.multiSelect[name] = !m.multiSelect[name]
-				}
-			} else {
-				// Presets tab - toggle all servers in preset
-				if len(m.filteredPresets) > 0 && m.presetCursor < len(m.filteredPresets) {
-					presetName := m.filteredPresets[m.presetCursor]
-					preset := m.config.Presets[presetName]
-					if preset != nil {
-						// Get available servers in this preset
-						var availableInPreset []string
-						for _, srvName := range preset.Servers {
-							// Only include servers that are in m.servers (uninstalled)
-							for _, s := range m.servers {
-								if s == srvName {
-									availableInPreset = append(availableInPreset, srvName)
-									break
-								}
-							}
-						}
-						// Check if all are selected
-						allSelected := len(availableInPreset) > 0
-						for _, srvName := range availableInPreset {
-							if !m.multiSelect[srvName] {
-								allSelected = false
-								break
-							}
-						}
-						// Toggle: if all selected -> deselect all, else select all
-						for _, srvName := range availableInPreset {
-							m.multiSelect[srvName] = !allSelected
-						}
-					}
-				}
-			}
-		}
-
-	case "/":
-		// Enter filter mode
-		if m.multiSelectMode {
-			m.filtering = true
-		}
-
-	case "enter":
-		if m.multiSelectMode {
-			// In multi-select mode, proceed with selected servers
-			selectedServers := m.getSelectedServers()
-			if len(selectedServers) > 0 {
-				// Transition to BulkConfigureModel
-				bulkModel := NewBulkConfigureModelWithInstaller(selectedServers, m.config, m.adapter, m.installer, m.scope)
-				return bulkModel, bulkModel.Init()
-			}
-			// No selection - do nothing or show message
-			return m, nil
-		}
-		// Single-select mode - go to details
-		if len(serverList) > 0 && m.cursor < len(serverList) {
-			m.selected = serverList[m.cursor]
-			m.state = StateDetails
-		}
-
-	default:
-		// In multi-select mode, typing starts filter
-		if m.multiSelectMode && len(msg.String()) == 1 {
-			m.filtering = true
-			m.filterText = msg.String()
-			m.updateFilter()
-		}
+	switch result.TransitionTo {
+	case "details":
+		m.selected = result.Selected
+		m.state = StateDetails
+	case "bulk_configure":
+		bulkModel := NewBulkConfigureModelWithInstaller(result.SelectedServers, m.config, m.adapter, m.installer, m.scope)
+		return bulkModel, bulkModel.Init()
 	}
 
 	return m, nil
@@ -439,34 +275,31 @@ func (m Model) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updateDetails handles input in the details state
 func (m Model) updateDetails(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "ctrl+c":
-		return m, tea.Quit
+	params := states.DetailsUpdateParams{
+		Msg:      msg,
+		Selected: m.selected,
+		Config:   m.config,
+	}
 
-	case "esc", "backspace":
+	result := m.detailsHandler.Update(params)
+
+	if result.ShouldQuit {
+		return m, tea.Quit
+	}
+
+	switch result.TransitionTo {
+	case "browsing":
 		m.state = StateBrowsing
 		m.selected = ""
-
-	case "enter":
-		// Move to configuration if server has env vars
-		server := m.config.Servers[m.selected]
-		if server != nil && len(server.Env) > 0 {
-			// Initialize env keys sorted
-			m.envKeys = make([]string, 0, len(server.Env))
-			for key := range server.Env {
-				m.envKeys = append(m.envKeys, key)
-			}
-			sort.Strings(m.envKeys)
-
-			m.currentField = 0
-			m.textInput = ""
-			m.cursorPos = 0
-			m.state = StateConfiguring
-		} else {
-			// No env vars, skip to installing
-			m.state = StateInstalling
-			return m, m.installServer()
-		}
+	case "configuring":
+		m.envKeys = result.EnvKeys
+		m.currentField = result.CurrentField
+		m.textInput = result.TextInput
+		m.cursorPos = result.CursorPos
+		m.state = StateConfiguring
+	case "installing":
+		m.state = StateInstalling
+		return m, m.installServer()
 	}
 
 	return m, nil
@@ -474,75 +307,34 @@ func (m Model) updateDetails(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updateConfiguring handles input in the configuring state
 func (m Model) updateConfiguring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "ctrl+c":
+	params := states.ConfiguringUpdateParams{
+		Msg:          msg,
+		Selected:     m.selected,
+		EnvKeys:      m.envKeys,
+		EnvValues:    m.envValues,
+		CurrentField: m.currentField,
+		TextInput:    m.textInput,
+		CursorPos:    m.cursorPos,
+	}
+
+	result := m.configuringHandler.Update(params)
+
+	// Update model state from result
+	m.envValues = result.EnvValues
+	m.currentField = result.CurrentField
+	m.textInput = result.TextInput
+	m.cursorPos = result.CursorPos
+
+	if result.ShouldQuit {
 		return m, tea.Quit
+	}
 
-	case "esc":
+	switch result.TransitionTo {
+	case "details":
 		m.state = StateDetails
-		m.envValues = make(map[string]string) // reset values
-		m.textInput = ""
-		m.currentField = 0
-
-	case "enter", "tab":
-		// Save current field value
-		if m.currentField < len(m.envKeys) {
-			m.envValues[m.envKeys[m.currentField]] = m.textInput
-		}
-
-		// Move to next field
-		m.currentField++
-		if m.currentField >= len(m.envKeys) {
-			// All fields filled, proceed to installation
-			m.state = StateInstalling
-			return m, m.installServer()
-		} else {
-			// Load value for next field (if already set)
-			m.textInput = m.envValues[m.envKeys[m.currentField]]
-			m.cursorPos = len(m.textInput)
-		}
-
-	case "shift+tab":
-		// Save current field value
-		if m.currentField < len(m.envKeys) {
-			m.envValues[m.envKeys[m.currentField]] = m.textInput
-		}
-
-		// Move to previous field
-		if m.currentField > 0 {
-			m.currentField--
-			m.textInput = m.envValues[m.envKeys[m.currentField]]
-			m.cursorPos = len(m.textInput)
-		}
-
-	case "backspace":
-		if m.cursorPos > 0 {
-			m.textInput = m.textInput[:m.cursorPos-1] + m.textInput[m.cursorPos:]
-			m.cursorPos--
-		}
-
-	case "left":
-		if m.cursorPos > 0 {
-			m.cursorPos--
-		}
-
-	case "right":
-		if m.cursorPos < len(m.textInput) {
-			m.cursorPos++
-		}
-
-	case "home", "ctrl+a":
-		m.cursorPos = 0
-
-	case "end", "ctrl+e":
-		m.cursorPos = len(m.textInput)
-
-	default:
-		// Handle regular character input
-		if len(msg.String()) == 1 {
-			m.textInput = m.textInput[:m.cursorPos] + msg.String() + m.textInput[m.cursorPos:]
-			m.cursorPos++
-		}
+	case "installing":
+		m.state = StateInstalling
+		return m, m.installServer()
 	}
 
 	return m, nil
@@ -550,8 +342,13 @@ func (m Model) updateConfiguring(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updateInstalling handles input in the installing state
 func (m Model) updateInstalling(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "ctrl+c":
+	params := states.InstallingUpdateParams{
+		Msg: msg,
+	}
+
+	result := m.installingHandler.UpdateInstalling(params)
+
+	if result.ShouldQuit {
 		return m, tea.Quit
 	}
 
@@ -560,8 +357,13 @@ func (m Model) updateInstalling(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updateComplete handles input in the complete state
 func (m Model) updateComplete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "ctrl+c", "enter":
+	params := states.CompleteUpdateParams{
+		Msg: msg,
+	}
+
+	result := m.installingHandler.UpdateComplete(params)
+
+	if result.ShouldQuit {
 		return m, tea.Quit
 	}
 
@@ -588,436 +390,72 @@ func (m Model) View() string {
 
 // viewBrowsing renders the browsing state
 func (m Model) viewBrowsing() string {
-	var s strings.Builder
-
-	// Title
-	if m.multiSelectMode {
-		s.WriteString(titleStyle.Render("Select MCP Servers") + "\n")
-	} else {
-		s.WriteString(titleStyle.Render("MCP Server Browser") + "\n")
+	params := states.BrowsingViewParams{
+		MultiSelectMode: m.multiSelectMode,
+		ActiveTab:       m.activeTab,
+		Filtering:       m.filtering,
+		FilterText:      m.filterText,
+		FilteredServers: m.filteredServers,
+		FilteredPresets: m.filteredPresets,
+		Servers:         m.servers,
+		Cursor:          m.cursor,
+		PresetCursor:    m.presetCursor,
+		MultiSelect:     m.multiSelect,
+		Config:          m.config,
+		Width:           m.width,
+		Height:          m.height,
+		AllInstalled:    m.allInstalled,
 	}
 
-	// Tab header (multi-select mode only)
-	if m.multiSelectMode {
-		serverTabLabel := "Servers"
-		presetTabLabel := "Presets"
-		if m.activeTab == 0 {
-			s.WriteString(tabActiveStyle.Render(" "+serverTabLabel+" "))
-			s.WriteString(tabInactiveStyle.Render(" "+presetTabLabel+" "))
-		} else {
-			s.WriteString(tabInactiveStyle.Render(" "+serverTabLabel+" "))
-			s.WriteString(tabActiveStyle.Render(" "+presetTabLabel+" "))
-		}
-		s.WriteString("\n")
-	}
-
-	// Filter bar (in multi-select mode)
-	if m.multiSelectMode {
-		if m.filtering {
-			s.WriteString(labelStyle.Render("Filter: ") + valueStyle.Render(m.filterText) + selectedStyle.Render("_") + "\n")
-		} else if m.filterText != "" {
-			s.WriteString(labelStyle.Render("Filter: ") + valueStyle.Render(m.filterText) + "\n")
-		}
-	}
-	s.WriteString("\n")
-
-	if m.multiSelectMode && m.activeTab == 1 {
-		// Render presets tab
-		return m.viewPresetsTab(&s)
-	}
-
-	// Get the list to display
-	serverList := m.servers
-	if m.multiSelectMode {
-		serverList = m.filteredServers
-	}
-
-	if len(serverList) == 0 {
-		if m.filterText != "" {
-			s.WriteString(errorStyle.Render("No servers match filter") + "\n")
-		} else if m.allInstalled {
-			s.WriteString(infoStyle.Render("All servers are already installed") + "\n")
-		} else {
-			s.WriteString(errorStyle.Render("No servers found in registry") + "\n")
-		}
-	} else {
-		// Calculate visible range for scrolling
-		visibleHeight := m.height - 8 // Account for title, help text, filter, status
-		if visibleHeight < 1 {
-			visibleHeight = 10 // Default minimum
-		}
-
-		start := 0
-		end := len(serverList)
-
-		// Implement scrolling if list is longer than screen
-		if len(serverList) > visibleHeight {
-			// Keep cursor centered when possible
-			start = m.cursor - visibleHeight/2
-			if start < 0 {
-				start = 0
-			}
-			end = start + visibleHeight
-			if end > len(serverList) {
-				end = len(serverList)
-				start = end - visibleHeight
-				if start < 0 {
-					start = 0
-				}
-			}
-		}
-
-		// Render visible servers
-		for i := start; i < end; i++ {
-			name := serverList[i]
-			server := m.config.Servers[name]
-			isCursor := i == m.cursor
-
-			// Cursor indicator
-			cursor := "  "
-			if isCursor {
-				cursor = "► "
-			}
-
-			// Checkbox (multi-select mode only)
-			checkbox := ""
-			if m.multiSelectMode {
-				if m.multiSelect[name] {
-					checkbox = checkboxCheckedStyle.Render("[✓]") + " "
-				} else {
-					checkbox = checkboxUncheckedStyle.Render("[ ]") + " "
-				}
-			}
-
-			// Transport indicator
-			var transportBadge string
-			switch server.Transport {
-			case "stdio":
-				transportBadge = transportStdioStyle.Render("[stdio]")
-			case "http", "https":
-				transportBadge = transportHTTPStyle.Render("[http]")
-			default:
-				transportBadge = transportUnknownStyle.Render("[" + server.Transport + "]")
-			}
-
-			// Description (truncate if needed)
-			description := server.Description
-			maxDescLen := 60
-			if m.width > 0 && m.width < 80 {
-				maxDescLen = m.width - 30
-			}
-			if len(description) > maxDescLen {
-				description = description[:maxDescLen-3] + "..."
-			}
-
-			// Build the line without style padding - control alignment manually
-			if isCursor {
-				// Highlighted row - use white bold to distinguish from transport badges
-				highlightedName := lipgloss.NewStyle().Foreground(colorWhite).Bold(true)
-				s.WriteString(cursor)
-				s.WriteString(checkbox)
-				s.WriteString(highlightedName.Render(name) + " ")
-				s.WriteString(transportBadge)
-				s.WriteString("\n")
-				if description != "" {
-					indent := "  "
-					if m.multiSelectMode {
-						indent = "      " // account for cursor + checkbox
-					}
-					s.WriteString(valueStyle.Render(indent+description) + "\n")
-				}
-			} else {
-				// Normal row
-				s.WriteString(cursor)
-				s.WriteString(checkbox)
-				s.WriteString(name + " ")
-				s.WriteString(transportBadge)
-				s.WriteString("\n")
-				if description != "" {
-					indent := "  "
-					if m.multiSelectMode {
-						indent = "      " // account for cursor + checkbox
-					}
-					// Use simple gray color without padding
-					dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-					s.WriteString(dimStyle.Render(indent+description) + "\n")
-				}
-			}
-		}
-
-		// Show scroll indicator if needed
-		if len(serverList) > visibleHeight {
-			s.WriteString("\n" + infoStyle.Render(fmt.Sprintf("  Showing %d-%d of %d", start+1, end, len(serverList))))
-		}
-	}
-
-	// Status bar (multi-select mode)
-	if m.multiSelectMode {
-		selectedCount := m.getSelectedCount()
-		s.WriteString("\n" + selectedCountStyle.Render(fmt.Sprintf("Selected: %d", selectedCount)))
-	}
-
-	// Help text
-	s.WriteString("\n")
-	if m.multiSelectMode {
-		if m.filtering {
-			s.WriteString(helpStyle.Render("Type to filter • Enter: done • Esc: clear filter"))
-		} else {
-			s.WriteString(helpStyle.Render("Tab: switch tabs • ↑/↓: navigate • Space: toggle • Enter: install selected • Type: filter • Esc: quit"))
-		}
-	} else {
-		s.WriteString(helpStyle.Render("↑/k: up • ↓/j: down • enter: select • q: quit"))
-	}
-
-	return s.String()
-}
-
-// viewPresetsTab renders the presets tab content
-func (m Model) viewPresetsTab(s *strings.Builder) string {
-	// Filter bar
-	if m.filtering {
-		s.WriteString(labelStyle.Render("Filter: ") + valueStyle.Render(m.filterText) + selectedStyle.Render("_") + "\n")
-	} else if m.filterText != "" {
-		s.WriteString(labelStyle.Render("Filter: ") + valueStyle.Render(m.filterText) + "\n")
-	}
-	s.WriteString("\n")
-
-	if len(m.filteredPresets) == 0 {
-		if m.filterText != "" {
-			s.WriteString(errorStyle.Render("No presets match filter") + "\n")
-		} else {
-			s.WriteString(infoStyle.Render("No presets available") + "\n")
-		}
-	} else {
-		for i, name := range m.filteredPresets {
-			preset := m.config.Presets[name]
-			isCursor := i == m.presetCursor
-
-			cursor := "  "
-			if isCursor {
-				cursor = "► "
-			}
-
-			// Count available/total servers
-			total := len(preset.Servers)
-			available := 0
-			selected := 0
-			for _, srvName := range preset.Servers {
-				for _, s := range m.servers {
-					if s == srvName {
-						available++
-						if m.multiSelect[srvName] {
-							selected++
-						}
-						break
-					}
-				}
-			}
-
-			// Build display
-			if isCursor {
-				// Highlighted row - use white bold to distinguish from other cyan elements
-				highlightedName := lipgloss.NewStyle().Foreground(colorWhite).Bold(true)
-				s.WriteString(cursor)
-				s.WriteString(highlightedName.Render(name))
-				s.WriteString(fmt.Sprintf(" (%d/%d available", available, total))
-				if selected > 0 {
-					s.WriteString(fmt.Sprintf(", %d selected", selected))
-				}
-				s.WriteString(")\n")
-				if preset.Description != "" {
-					s.WriteString(valueStyle.Render("      "+preset.Description) + "\n")
-				}
-			} else {
-				s.WriteString(cursor + name)
-				s.WriteString(fmt.Sprintf(" (%d/%d available)\n", available, total))
-				if preset.Description != "" {
-					dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-					s.WriteString(dimStyle.Render("      "+preset.Description) + "\n")
-				}
-			}
-		}
-	}
-
-	// Status and help
-	selectedCount := m.getSelectedCount()
-	s.WriteString("\n" + selectedCountStyle.Render(fmt.Sprintf("Selected: %d servers", selectedCount)))
-	s.WriteString("\n")
-	if m.filtering {
-		s.WriteString(helpStyle.Render("Type to filter • Enter: done • Esc: clear filter"))
-	} else {
-		s.WriteString(helpStyle.Render("Tab: switch tabs • ↑/↓: navigate • Space: toggle preset servers • Enter: install • Esc: quit"))
-	}
-
-	return s.String()
+	return m.browsingHandler.View(params)
 }
 
 // viewDetails renders the details state
 func (m Model) viewDetails() string {
-	server := m.config.Servers[m.selected]
-	if server == nil {
-		return errorStyle.Render("Server not found") + "\n"
+	params := states.DetailsViewParams{
+		Selected: m.selected,
+		Config:   m.config,
 	}
 
-	var s strings.Builder
-	s.WriteString(titleStyle.Render("Server Details") + "\n\n")
-
-	// Server name and description
-	s.WriteString(labelStyle.Render("Name: ") + valueStyle.Render(m.selected) + "\n")
-	if server.Description != "" {
-		s.WriteString(labelStyle.Render("Description: ") + valueStyle.Render(server.Description) + "\n")
-	}
-	s.WriteString("\n")
-
-	// Transport details
-	s.WriteString(labelStyle.Render("Transport: ") + valueStyle.Render(server.Transport) + "\n")
-
-	if server.Transport == "stdio" {
-		s.WriteString(labelStyle.Render("Command: ") + valueStyle.Render(server.Command) + "\n")
-		if len(server.Args) > 0 {
-			s.WriteString(labelStyle.Render("Arguments: ") + valueStyle.Render(strings.Join(server.Args, " ")) + "\n")
-		}
-	} else if server.Transport == "http" {
-		s.WriteString(labelStyle.Render("URL: ") + valueStyle.Render(server.URL) + "\n")
-	}
-	s.WriteString("\n")
-
-	// Environment variables
-	if len(server.Env) > 0 {
-		s.WriteString(labelStyle.Render("Environment Variables:") + "\n")
-
-		// Sort env vars for consistent display
-		envKeys := make([]string, 0, len(server.Env))
-		for key := range server.Env {
-			envKeys = append(envKeys, key)
-		}
-		sort.Strings(envKeys)
-
-		for _, key := range envKeys {
-			env := server.Env[key]
-			required := ""
-			if env.Required {
-				required = infoStyle.Render(" (required)")
-			}
-			s.WriteString("  " + labelStyle.Render(key) + required + "\n")
-			if env.Description != "" {
-				s.WriteString("    " + normalStyle.Render(env.Description) + "\n")
-			}
-		}
-		s.WriteString("\n")
-	}
-
-	s.WriteString(helpStyle.Render("enter: configure • esc: back • q: quit"))
-
-	return s.String()
+	return m.detailsHandler.View(params)
 }
 
 // viewConfiguring renders the configuring state
 func (m Model) viewConfiguring() string {
-	server := m.config.Servers[m.selected]
-	if server == nil || len(m.envKeys) == 0 {
-		return errorStyle.Render("No configuration needed") + "\n"
+	params := states.ConfiguringViewParams{
+		Selected:     m.selected,
+		Config:       m.config,
+		EnvKeys:      m.envKeys,
+		EnvValues:    m.envValues,
+		CurrentField: m.currentField,
+		TextInput:    m.textInput,
+		CursorPos:    m.cursorPos,
 	}
 
-	var s strings.Builder
-	s.WriteString(titleStyle.Render("Configure Environment Variables") + "\n\n")
-	s.WriteString(labelStyle.Render("Server: ") + valueStyle.Render(m.selected) + "\n\n")
-
-	// Display all env vars with their current state
-	for i, key := range m.envKeys {
-		env := server.Env[key]
-
-		// Field label
-		required := ""
-		if env.Required {
-			required = infoStyle.Render(" *")
-		}
-
-		if i == m.currentField {
-			// Current field - highlight
-			s.WriteString(selectedStyle.Render("► " + key) + required + "\n")
-		} else {
-			// Other fields
-			s.WriteString("  " + labelStyle.Render(key) + required + "\n")
-		}
-
-		// Description
-		if env.Description != "" {
-			s.WriteString("    " + normalStyle.Render(env.Description) + "\n")
-		}
-
-		// Value display
-		var displayValue string
-		if i == m.currentField {
-			// Show current input with cursor
-			displayValue = components.RenderInputWithCursor(m.textInput, m.cursorPos, key, selectedStyle.Render)
-		} else if val, ok := m.envValues[key]; ok && val != "" {
-			// Show saved value (masked if secret)
-			if envpkg.IsSecret(key) {
-				displayValue = strings.Repeat("*", len(val))
-			} else {
-				displayValue = val
-			}
-		} else if env.Default != "" {
-			displayValue = normalStyle.Render("(default: " + env.Default + ")")
-		} else {
-			displayValue = normalStyle.Render("(empty)")
-		}
-
-		if i == m.currentField {
-			s.WriteString("    " + displayValue + "\n")
-		} else {
-			s.WriteString("    " + valueStyle.Render(displayValue) + "\n")
-		}
-		s.WriteString("\n")
-	}
-
-	// Progress indicator
-	progress := labelStyle.Render("Field ") +
-		valueStyle.Render(string(rune('0'+m.currentField+1))) +
-		labelStyle.Render(" of ") +
-		valueStyle.Render(string(rune('0'+len(m.envKeys))))
-	s.WriteString(progress + "\n\n")
-
-	// Help text
-	if m.currentField < len(m.envKeys)-1 {
-		s.WriteString(helpStyle.Render("enter/tab: next • shift+tab: previous • esc: cancel • q: quit"))
-	} else {
-		s.WriteString(helpStyle.Render("enter: proceed • shift+tab: previous • esc: cancel • q: quit"))
-	}
-
-	return s.String()
+	return m.configuringHandler.View(params)
 }
 
 // viewInstalling renders the installing state
 func (m Model) viewInstalling() string {
-	var s strings.Builder
-	s.WriteString(titleStyle.Render("Installing Server") + "\n\n")
-	s.WriteString(labelStyle.Render("Server: ") + valueStyle.Render(m.selected) + "\n")
-	s.WriteString(labelStyle.Render("Scope: ") + valueStyle.Render(string(m.scope)) + "\n")
-	s.WriteString(labelStyle.Render("Adapter: ") + valueStyle.Render(m.adapter.Name()) + "\n\n")
-	s.WriteString(infoStyle.Render("Installing...") + "\n")
-	s.WriteString("\n" + helpStyle.Render("Please wait..."))
-	return s.String()
+	params := states.InstallingViewParams{
+		Selected:    m.selected,
+		Scope:       m.scope,
+		AdapterName: m.adapter.Name(),
+	}
+
+	return m.installingHandler.ViewInstalling(params)
 }
 
 // viewComplete renders the complete state
 func (m Model) viewComplete() string {
-	var s strings.Builder
-	s.WriteString(titleStyle.Render("Installation Complete") + "\n\n")
-
-	if m.err != nil {
-		s.WriteString(errorStyle.Render("✗ " + m.installMsg) + "\n\n")
-		s.WriteString(labelStyle.Render("Details:") + "\n")
-		s.WriteString(normalStyle.Render(m.err.Error()) + "\n")
-	} else {
-		s.WriteString(successStyle.Render("✓ " + m.installMsg) + "\n\n")
-		s.WriteString(labelStyle.Render("Server: ") + valueStyle.Render(m.selected) + "\n")
-		s.WriteString(labelStyle.Render("Scope: ") + valueStyle.Render(string(m.scope)) + "\n")
+	params := states.CompleteViewParams{
+		Selected:   m.selected,
+		Scope:      m.scope,
+		Err:        m.err,
+		InstallMsg: m.installMsg,
 	}
 
-	s.WriteString("\n" + helpStyle.Render("enter/q: quit"))
-	return s.String()
+	return m.installingHandler.ViewComplete(params)
 }
 
 // installServer creates a command that installs the server in the background
