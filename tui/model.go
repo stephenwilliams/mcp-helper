@@ -721,10 +721,11 @@ func (m Model) viewBrowsing() string {
 
 			// Build the line without style padding - control alignment manually
 			if isCursor {
-				// Highlighted row
+				// Highlighted row - use white bold to distinguish from transport badges
+				highlightedName := lipgloss.NewStyle().Foreground(colorWhite).Bold(true)
 				s.WriteString(cursor)
 				s.WriteString(checkbox)
-				s.WriteString(labelStyle.Render(name) + " ")
+				s.WriteString(highlightedName.Render(name) + " ")
 				s.WriteString(transportBadge)
 				s.WriteString("\n")
 				if description != "" {
@@ -824,8 +825,10 @@ func (m Model) viewPresetsTab(s *strings.Builder) string {
 
 			// Build display
 			if isCursor {
+				// Highlighted row - use white bold to distinguish from other cyan elements
+				highlightedName := lipgloss.NewStyle().Foreground(colorWhite).Bold(true)
 				s.WriteString(cursor)
-				s.WriteString(labelStyle.Render(name))
+				s.WriteString(highlightedName.Render(name))
 				s.WriteString(fmt.Sprintf(" (%d/%d available", available, total))
 				if selected > 0 {
 					s.WriteString(fmt.Sprintf(", %d selected", selected))

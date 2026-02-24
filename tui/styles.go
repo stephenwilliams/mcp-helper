@@ -17,10 +17,11 @@ var (
 			Foreground(colorCyan).
 			MarginBottom(1)
 
-	// Selected item style
+	// Selected item style - uses background highlight to distinguish from transport badges
 	selectedStyle = lipgloss.NewStyle().
-			Foreground(colorCyan).
+			Foreground(colorWhite).
 			Bold(true).
+			Background(lipgloss.Color("236")).
 			PaddingLeft(2)
 
 	// Normal item style
