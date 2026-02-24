@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
+	"github.com/stephenwilliams/mcp-helper/internal/app"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
 	envpkg "github.com/stephenwilliams/mcp-helper/internal/env"
 	"github.com/stephenwilliams/mcp-helper/tui/components"
@@ -31,6 +33,7 @@ type BulkConfigureModel struct {
 	currentIndex  int                   // which server is being configured
 	config        *config.Config        // server registry config
 	adapter       adapter.Adapter       // adapter for installation
+	installer     ServerInstaller       // service layer for installation
 	scope         adapter.Scope         // installation scope
 	envKeys       []string              // env var keys for current server
 	envValues     map[string]string     // env var values for current server
@@ -47,11 +50,18 @@ type BulkConfigureModel struct {
 
 // NewBulkConfigureModel creates a new bulk configuration model
 func NewBulkConfigureModel(servers []string, cfg *config.Config, adptr adapter.Adapter, scope adapter.Scope) BulkConfigureModel {
+	installer := app.NewServerInstaller(cfg, adptr)
+	return NewBulkConfigureModelWithInstaller(servers, cfg, adptr, installer, scope)
+}
+
+// NewBulkConfigureModelWithInstaller creates a new bulk configuration model with a custom installer
+func NewBulkConfigureModelWithInstaller(servers []string, cfg *config.Config, adptr adapter.Adapter, installer ServerInstaller, scope adapter.Scope) BulkConfigureModel {
 	m := BulkConfigureModel{
 		servers:      servers,
 		currentIndex: 0,
 		config:       cfg,
 		adapter:      adptr,
+		installer:    installer,
 		scope:        scope,
 		envValues:    make(map[string]string),
 		results:      make([]installResult, 0, len(servers)),
@@ -499,20 +509,19 @@ func (m BulkConfigureModel) viewComplete() string {
 // installCurrentServer creates a command that installs the current server
 func (m BulkConfigureModel) installCurrentServer() tea.Cmd {
 	serverName := m.servers[m.currentIndex]
+	envValues := m.envValues
 
 	return func() tea.Msg {
-		server := m.config.Servers[serverName]
-		if server == nil {
-			return bulkInstallCompleteMsg{
-				serverName: serverName,
-				err:        fmt.Errorf("server not found: %s", serverName),
-			}
+		req := app.ServerInstallRequest{
+			ServerName: serverName,
+			Scope:      m.scope,
+			EnvValues:  envValues,
 		}
 
-		err := m.adapter.AddServer(serverName, server, m.scope, m.envValues)
+		resp := m.installer.Install(context.Background(), req)
 		return bulkInstallCompleteMsg{
 			serverName: serverName,
-			err:        err,
+			err:        resp.Error,
 		}
 	}
 }

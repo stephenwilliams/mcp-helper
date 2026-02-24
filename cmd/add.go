@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
+	"github.com/stephenwilliams/mcp-helper/internal/app"
 	"github.com/stephenwilliams/mcp-helper/internal/env"
 	"github.com/stephenwilliams/mcp-helper/internal/template"
 	"github.com/stephenwilliams/mcp-helper/tui"
@@ -159,6 +161,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return err
 			}
+			installer := app.NewServerInstaller(cfg, adptr)
 			for _, srvName := range availableServers {
 				server := cfg.Servers[srvName]
 				tmplData := template.NewTemplateData()
@@ -170,8 +173,14 @@ func runAdd(cmd *cobra.Command, args []string) error {
 				if err != nil {
 					return fmt.Errorf("server %s: %w", srvName, err)
 				}
-				if err := adptr.AddServer(srvName, processedServer, parsedScope, collectedEnv); err != nil {
-					return fmt.Errorf("failed to install %s: %w", srvName, err)
+				req := app.ServerInstallRequest{
+					ServerName: srvName,
+					Scope:      parsedScope,
+					EnvValues:  collectedEnv,
+				}
+				resp := installer.Install(context.Background(), req)
+				if resp.Error != nil {
+					return fmt.Errorf("failed to install %s: %w", srvName, resp.Error)
 				}
 				fmt.Printf("Successfully added server '%s' to %s (scope: %s)\n", srvName, adptr.Name(), parsedScope)
 			}
@@ -231,17 +240,32 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Create installer service
+	installer := app.NewServerInstaller(cfg, adptr)
+
 	// Dry run or execute (server already processed, no template work needed in adapter)
 	if addDryRun {
-		dryRunOutput := adptr.DryRun(serverName, processedServer, parsedScope, collectedEnv)
+		req := app.ServerInstallRequest{
+			ServerName: serverName,
+			Scope:      parsedScope,
+			EnvValues:  collectedEnv,
+			DryRun:     true,
+		}
+		dryRunOutput := installer.DryRun(req)
 		fmt.Println("Command that would be executed:")
 		fmt.Println(dryRunOutput)
 		return nil
 	}
 
 	// Execute
-	if err := adptr.AddServer(serverName, processedServer, parsedScope, collectedEnv); err != nil {
-		return err
+	req := app.ServerInstallRequest{
+		ServerName: serverName,
+		Scope:      parsedScope,
+		EnvValues:  collectedEnv,
+	}
+	resp := installer.Install(context.Background(), req)
+	if resp.Error != nil {
+		return resp.Error
 	}
 
 	fmt.Printf("Successfully added server '%s' to %s (scope: %s)\n", serverName, adptr.Name(), parsedScope)

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
+	"github.com/stephenwilliams/mcp-helper/internal/app"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
 	envpkg "github.com/stephenwilliams/mcp-helper/internal/env"
 	"github.com/stephenwilliams/mcp-helper/tui/components"
@@ -34,7 +36,8 @@ type Model struct {
 	state         State
 	config        *config.Config
 	adapter       adapter.Adapter
-	servers       []string // sorted server names
+	installer     ServerInstaller   // service layer for installation
+	servers       []string          // sorted server names
 	cursor        int
 	selected      string // selected server name
 	scope         adapter.Scope
@@ -70,6 +73,13 @@ func NewModel(cfg *config.Config, adptr adapter.Adapter) Model {
 
 // NewModelWithOptions creates a new TUI model with options
 func NewModelWithOptions(cfg *config.Config, adptr adapter.Adapter, scope adapter.Scope, multiSelect bool) Model {
+	// Create the server installer service
+	installer := app.NewServerInstaller(cfg, adptr)
+	return NewModelWithInstaller(cfg, adptr, installer, scope, multiSelect)
+}
+
+// NewModelWithInstaller creates a new TUI model with a custom installer
+func NewModelWithInstaller(cfg *config.Config, adptr adapter.Adapter, installer ServerInstaller, scope adapter.Scope, multiSelect bool) Model {
 	// Extract and sort server names, filtering out already-installed servers
 	servers := make([]string, 0, len(cfg.Servers))
 	for name := range cfg.Servers {
@@ -86,6 +96,7 @@ func NewModelWithOptions(cfg *config.Config, adptr adapter.Adapter, scope adapte
 		state:           StateBrowsing,
 		config:          cfg,
 		adapter:         adptr,
+		installer:       installer,
 		servers:         servers,
 		cursor:          0,
 		envValues:       make(map[string]string),
@@ -402,7 +413,7 @@ func (m Model) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			selectedServers := m.getSelectedServers()
 			if len(selectedServers) > 0 {
 				// Transition to BulkConfigureModel
-				bulkModel := NewBulkConfigureModel(selectedServers, m.config, m.adapter, m.scope)
+				bulkModel := NewBulkConfigureModelWithInstaller(selectedServers, m.config, m.adapter, m.installer, m.scope)
 				return bulkModel, bulkModel.Init()
 			}
 			// No selection - do nothing or show message
@@ -1012,12 +1023,13 @@ func (m Model) viewComplete() string {
 // installServer creates a command that installs the server in the background
 func (m Model) installServer() tea.Cmd {
 	return func() tea.Msg {
-		server := m.config.Servers[m.selected]
-		if server == nil {
-			return installCompleteMsg{err: fmt.Errorf("server not found: %s", m.selected)}
+		req := app.ServerInstallRequest{
+			ServerName: m.selected,
+			Scope:      m.scope,
+			EnvValues:  m.envValues,
 		}
 
-		err := m.adapter.AddServer(m.selected, server, m.scope, m.envValues)
-		return installCompleteMsg{err: err}
+		resp := m.installer.Install(context.Background(), req)
+		return installCompleteMsg{err: resp.Error}
 	}
 }
