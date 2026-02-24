@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
@@ -8,7 +10,12 @@ import (
 
 // Run starts the TUI application
 func Run(cfg *config.Config, adptr adapter.Adapter) error {
-	p := tea.NewProgram(NewModel(cfg, adptr), tea.WithAltScreen())
+	m := NewModel(cfg, adptr)
+	if m.allInstalled {
+		fmt.Println("All servers are already installed.")
+		return nil
+	}
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	_, err := p.Run()
 	return err
 }
@@ -17,6 +24,10 @@ func Run(cfg *config.Config, adptr adapter.Adapter) error {
 func RunFuzzySelect(cfg *config.Config, adptr adapter.Adapter, scope adapter.Scope) ([]string, error) {
 	// Use the enhanced Model with multi-select mode enabled
 	m := NewModelWithOptions(cfg, adptr, scope, true)
+	if m.allInstalled {
+		fmt.Println("All servers are already installed.")
+		return nil, nil
+	}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {

@@ -52,6 +52,7 @@ type Model struct {
 	filterText       string            // current filter text
 	filteredServers  []string          // servers matching filter
 	filtering        bool              // whether in filter input mode
+	allInstalled     bool              // true when all servers from config are already installed
 }
 
 // NewModel creates a new TUI model
@@ -61,12 +62,17 @@ func NewModel(cfg *config.Config, adptr adapter.Adapter) Model {
 
 // NewModelWithOptions creates a new TUI model with options
 func NewModelWithOptions(cfg *config.Config, adptr adapter.Adapter, scope adapter.Scope, multiSelect bool) Model {
-	// Extract and sort server names
+	// Extract and sort server names, filtering out already-installed servers
 	servers := make([]string, 0, len(cfg.Servers))
 	for name := range cfg.Servers {
+		if adptr.ServerExists(name, scope) {
+			continue
+		}
 		servers = append(servers, name)
 	}
 	sort.Strings(servers)
+
+	allInstalled := len(cfg.Servers) > 0 && len(servers) == 0
 
 	m := Model{
 		state:           StateBrowsing,
@@ -79,6 +85,7 @@ func NewModelWithOptions(cfg *config.Config, adptr adapter.Adapter, scope adapte
 		multiSelectMode: multiSelect,
 		multiSelect:     make(map[string]bool),
 		filteredServers: servers, // Initially show all
+		allInstalled:    allInstalled,
 	}
 
 	return m
@@ -444,6 +451,8 @@ func (m Model) viewBrowsing() string {
 	if len(serverList) == 0 {
 		if m.filterText != "" {
 			s.WriteString(errorStyle.Render("No servers match filter") + "\n")
+		} else if m.allInstalled {
+			s.WriteString(infoStyle.Render("All servers are already installed") + "\n")
 		} else {
 			s.WriteString(errorStyle.Render("No servers found in registry") + "\n")
 		}
