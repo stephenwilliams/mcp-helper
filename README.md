@@ -204,6 +204,60 @@ mcp-helper aws discover --scope user
 mcp-helper aws discover --force
 ```
 
+## Tool Discovery and Pre-Approval
+
+Discover MCP tools from configured servers and pre-approve them to eliminate permission prompts during agent sessions.
+
+### List Available Tools
+
+```bash
+# List all tools from configured MCP servers
+mcp-helper tools list
+
+# Output as JSON for scripting
+mcp-helper tools list --json
+
+# Filter by server or scope
+mcp-helper tools list --server github
+mcp-helper tools list --scope user
+
+# Bypass cache for fresh results
+mcp-helper tools list --no-cache
+```
+
+The table output shows server name, scope, tool count, and status:
+
+```
+SERVER          SCOPE     TOOLS  STATUS
+github          user      5      ok
+filesystem      project   3      ok
+slack           user      -      timeout (10s)
+```
+
+### Pre-Approve Tools
+
+```bash
+# Interactive TUI to select and approve tools
+mcp-helper tools approve
+
+# Preview changes without applying
+mcp-helper tools approve --dry-run
+
+# Write to specific settings file
+mcp-helper tools approve --target .claude/settings.local.json
+```
+
+The interactive TUI allows you to:
+- Expand servers to view individual tools
+- Select specific tools or use wildcards (`mcp__server__*` for all tools from a server)
+- Choose the target settings file (user, project, or local)
+- Preview changes in diff-style before applying
+- Preserve existing permissions
+
+Tools are added to the `permissions.allow` array in Claude Code's settings file with the format:
+- Specific tool: `mcp__<server>__<tool>`
+- Server wildcard: `mcp__<server>__*`
+
 ## Template Processing
 
 Configuration values support Go templates with [slim-sprig](https://github.com/go-task/slim-sprig) functions.

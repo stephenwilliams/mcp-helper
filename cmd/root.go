@@ -8,6 +8,7 @@ import (
 	_ "github.com/stephenwilliams/mcp-helper/internal/adapter/claudecode"
 	_ "github.com/stephenwilliams/mcp-helper/internal/adapter/opencode"
 	"github.com/stephenwilliams/mcp-helper/internal/config"
+	_ "github.com/stephenwilliams/mcp-helper/internal/permissions/claudecode"
 	"github.com/stephenwilliams/mcp-helper/tui"
 )
 
