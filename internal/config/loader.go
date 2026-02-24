@@ -109,6 +109,54 @@ func (c *Config) ListServers() []string {
 	return names
 }
 
+// GetPreset retrieves a preset configuration by name.
+// Returns an error if the preset is not found.
+func (c *Config) GetPreset(name string) (*Preset, error) {
+	if c.Presets == nil {
+		return nil, fmt.Errorf("no presets configured")
+	}
+
+	preset, exists := c.Presets[name]
+	if !exists {
+		return nil, fmt.Errorf("preset %q not found", name)
+	}
+
+	return preset, nil
+}
+
+// ListPresets returns a sorted list of all preset names in the configuration.
+func (c *Config) ListPresets() []string {
+	if c.Presets == nil {
+		return []string{}
+	}
+
+	names := make([]string, 0, len(c.Presets))
+	for name := range c.Presets {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+	return names
+}
+
+// ExpandPreset returns the list of server names for a preset.
+// It validates that all referenced servers exist in the configuration.
+func (c *Config) ExpandPreset(name string) ([]string, error) {
+	preset, err := c.GetPreset(name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate all servers exist
+	for _, serverName := range preset.Servers {
+		if _, exists := c.Servers[serverName]; !exists {
+			return nil, fmt.Errorf("preset %q references unknown server %q", name, serverName)
+		}
+	}
+
+	return preset.Servers, nil
+}
+
 // Validate checks that the configuration is valid.
 // It ensures transport values are "stdio" or "http" and required fields are present.
 func (c *Config) Validate() error {
@@ -134,6 +182,24 @@ func (c *Config) Validate() error {
 		// Validate http transport requirements
 		if server.Transport == "http" && server.URL == "" {
 			return fmt.Errorf("server %q uses http transport but has no URL specified", name)
+		}
+	}
+
+	// Validate presets
+	for name, preset := range c.Presets {
+		if preset == nil {
+			return fmt.Errorf("preset %q is nil", name)
+		}
+
+		if len(preset.Servers) == 0 {
+			return fmt.Errorf("preset %q has no servers", name)
+		}
+
+		// Verify all referenced servers exist
+		for _, serverName := range preset.Servers {
+			if _, exists := c.Servers[serverName]; !exists {
+				return fmt.Errorf("preset %q references unknown server %q", name, serverName)
+			}
 		}
 	}
 

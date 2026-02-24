@@ -52,3 +52,16 @@ servers:
         required: false
         description: Tenant identifier
         default: "default-tenant"
+
+presets:
+  dev-tools:
+    description: Development environment servers
+    servers:
+      - test-stdio
+      - minimal-stdio
+
+  http-servers:
+    description: HTTP-based servers
+    servers:
+      - test-http
+      - test-http-with-headers

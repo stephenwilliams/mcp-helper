@@ -9,6 +9,7 @@ type Config struct {
 	DefaultScope string             `yaml:"default_scope" mapstructure:"default_scope"`
 	DefaultAgent string             `yaml:"default_agent" mapstructure:"default_agent"`
 	Servers      map[string]*Server `yaml:"servers" mapstructure:"servers"`
+	Presets      map[string]*Preset `yaml:"presets" mapstructure:"presets"`
 }
 
 // Server represents an MCP server configuration.
@@ -31,4 +32,10 @@ type EnvVar struct {
 	Required    bool   `yaml:"required" mapstructure:"required"`
 	Description string `yaml:"description" mapstructure:"description"`
 	Default     string `yaml:"default" mapstructure:"default"`
+}
+
+// Preset represents a named collection of servers that can be installed together.
+type Preset struct {
+	Description string   `yaml:"description" mapstructure:"description"`
+	Servers     []string `yaml:"servers" mapstructure:"servers"`
 }

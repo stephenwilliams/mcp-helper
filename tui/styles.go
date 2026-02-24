@@ -102,4 +102,13 @@ var (
 
 	resultFailureStyle = lipgloss.NewStyle().
 				Foreground(colorRed)
+
+	// Tab styles for preset/server tabs
+	tabActiveStyle = lipgloss.NewStyle().
+				Foreground(colorCyan).
+				Bold(true).
+				Background(lipgloss.Color("236"))
+
+	tabInactiveStyle = lipgloss.NewStyle().
+				Foreground(colorGray)
 )

@@ -29,7 +29,16 @@ func ServerNameCompletion(cmd *cobra.Command, args []string, toComplete string) 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	return completionCfg.ListServers(), cobra.ShellCompDirectiveNoFileComp
+	// Get server names
+	servers := completionCfg.ListServers()
+
+	// Add preset names with p: prefix
+	presets := completionCfg.ListPresets()
+	for _, preset := range presets {
+		servers = append(servers, "p:"+preset)
+	}
+
+	return servers, cobra.ShellCompDirectiveNoFileComp
 }
 
 // ScopeCompletion provides completion for --scope flag values

@@ -53,6 +53,12 @@ type Model struct {
 	filteredServers  []string          // servers matching filter
 	filtering        bool              // whether in filter input mode
 	allInstalled     bool              // true when all servers from config are already installed
+
+	// Tab state (only used in multiSelectMode)
+	activeTab       int      // 0 = servers, 1 = presets
+	presets         []string // available preset names (filtered for availability)
+	filteredPresets []string // filtered preset names (from filterText)
+	presetCursor    int      // cursor position in presets tab
 }
 
 // NewModel creates a new TUI model
@@ -88,6 +94,29 @@ func NewModelWithOptions(cfg *config.Config, adptr adapter.Adapter, scope adapte
 		allInstalled:    allInstalled,
 	}
 
+	// Initialize presets for multi-select mode
+	if multiSelect && cfg.Presets != nil {
+		allPresets := cfg.ListPresets()
+		// Filter presets where at least one server is available (uninstalled)
+		for _, pName := range allPresets {
+			preset := cfg.Presets[pName]
+			if preset == nil {
+				continue
+			}
+			hasAvailable := false
+			for _, srvName := range preset.Servers {
+				if !adptr.ServerExists(srvName, scope) {
+					hasAvailable = true
+					break
+				}
+			}
+			if hasAvailable {
+				m.presets = append(m.presets, pName)
+			}
+		}
+		m.filteredPresets = m.presets
+	}
+
 	return m
 }
 
@@ -110,6 +139,28 @@ func (m *Model) updateFilter() {
 	// Reset cursor if it's out of bounds
 	if m.cursor >= len(m.filteredServers) {
 		m.cursor = 0
+	}
+}
+
+// updatePresetFilter filters the preset list based on filterText
+func (m *Model) updatePresetFilter() {
+	if m.filterText == "" {
+		m.filteredPresets = m.presets
+		return
+	}
+	m.filteredPresets = nil
+	lower := strings.ToLower(m.filterText)
+	for _, name := range m.presets {
+		preset := m.config.Presets[name]
+		// Match against name or description
+		if strings.Contains(strings.ToLower(name), lower) ||
+			(preset != nil && strings.Contains(strings.ToLower(preset.Description), lower)) {
+			m.filteredPresets = append(m.filteredPresets, name)
+		}
+	}
+	// Reset cursor if out of bounds
+	if m.presetCursor >= len(m.filteredPresets) {
+		m.presetCursor = 0
 	}
 }
 
@@ -215,25 +266,85 @@ func (m Model) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.multiSelectMode && m.filterText != "" {
 			m.filterText = ""
 			m.updateFilter()
+			m.updatePresetFilter()
 			return m, nil
 		}
 		return m, tea.Quit
 
+	case "tab":
+		// Switch tabs (only in multi-select mode)
+		if m.multiSelectMode {
+			m.activeTab = (m.activeTab + 1) % 2
+			// Clear filter on tab switch
+			m.filterText = ""
+			m.filtering = false
+			m.updateFilter()
+			m.updatePresetFilter()
+		}
+
 	case "up", "k":
-		if m.cursor > 0 {
-			m.cursor--
+		if m.activeTab == 0 {
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		} else {
+			if m.presetCursor > 0 {
+				m.presetCursor--
+			}
 		}
 
 	case "down", "j":
-		if m.cursor < len(serverList)-1 {
-			m.cursor++
+		if m.activeTab == 0 {
+			if m.cursor < len(serverList)-1 {
+				m.cursor++
+			}
+		} else {
+			if m.presetCursor < len(m.filteredPresets)-1 {
+				m.presetCursor++
+			}
 		}
 
 	case " ":
 		// Toggle selection in multi-select mode
-		if m.multiSelectMode && len(serverList) > 0 && m.cursor < len(serverList) {
-			name := serverList[m.cursor]
-			m.multiSelect[name] = !m.multiSelect[name]
+		if m.multiSelectMode {
+			if m.activeTab == 0 {
+				// Servers tab
+				if len(serverList) > 0 && m.cursor < len(serverList) {
+					name := serverList[m.cursor]
+					m.multiSelect[name] = !m.multiSelect[name]
+				}
+			} else {
+				// Presets tab - toggle all servers in preset
+				if len(m.filteredPresets) > 0 && m.presetCursor < len(m.filteredPresets) {
+					presetName := m.filteredPresets[m.presetCursor]
+					preset := m.config.Presets[presetName]
+					if preset != nil {
+						// Get available servers in this preset
+						var availableInPreset []string
+						for _, srvName := range preset.Servers {
+							// Only include servers that are in m.servers (uninstalled)
+							for _, s := range m.servers {
+								if s == srvName {
+									availableInPreset = append(availableInPreset, srvName)
+									break
+								}
+							}
+						}
+						// Check if all are selected
+						allSelected := len(availableInPreset) > 0
+						for _, srvName := range availableInPreset {
+							if !m.multiSelect[srvName] {
+								allSelected = false
+								break
+							}
+						}
+						// Toggle: if all selected -> deselect all, else select all
+						for _, srvName := range availableInPreset {
+							m.multiSelect[srvName] = !allSelected
+						}
+					}
+				}
+			}
 		}
 
 	case "/":
@@ -432,6 +543,20 @@ func (m Model) viewBrowsing() string {
 		s.WriteString(titleStyle.Render("MCP Server Browser") + "\n")
 	}
 
+	// Tab header (multi-select mode only)
+	if m.multiSelectMode {
+		serverTabLabel := "Servers"
+		presetTabLabel := "Presets"
+		if m.activeTab == 0 {
+			s.WriteString(tabActiveStyle.Render(" "+serverTabLabel+" "))
+			s.WriteString(tabInactiveStyle.Render(" "+presetTabLabel+" "))
+		} else {
+			s.WriteString(tabInactiveStyle.Render(" "+serverTabLabel+" "))
+			s.WriteString(tabActiveStyle.Render(" "+presetTabLabel+" "))
+		}
+		s.WriteString("\n")
+	}
+
 	// Filter bar (in multi-select mode)
 	if m.multiSelectMode {
 		if m.filtering {
@@ -441,6 +566,11 @@ func (m Model) viewBrowsing() string {
 		}
 	}
 	s.WriteString("\n")
+
+	if m.multiSelectMode && m.activeTab == 1 {
+		// Render presets tab
+		return m.viewPresetsTab(&s)
+	}
 
 	// Get the list to display
 	serverList := m.servers
@@ -578,10 +708,88 @@ func (m Model) viewBrowsing() string {
 		if m.filtering {
 			s.WriteString(helpStyle.Render("Type to filter • Enter: done • Esc: clear filter"))
 		} else {
-			s.WriteString(helpStyle.Render("↑/↓: navigate • Space: toggle • Enter: install selected • Type: filter • Esc: quit"))
+			s.WriteString(helpStyle.Render("Tab: switch tabs • ↑/↓: navigate • Space: toggle • Enter: install selected • Type: filter • Esc: quit"))
 		}
 	} else {
 		s.WriteString(helpStyle.Render("↑/k: up • ↓/j: down • enter: select • q: quit"))
+	}
+
+	return s.String()
+}
+
+// viewPresetsTab renders the presets tab content
+func (m Model) viewPresetsTab(s *strings.Builder) string {
+	// Filter bar
+	if m.filtering {
+		s.WriteString(labelStyle.Render("Filter: ") + valueStyle.Render(m.filterText) + selectedStyle.Render("_") + "\n")
+	} else if m.filterText != "" {
+		s.WriteString(labelStyle.Render("Filter: ") + valueStyle.Render(m.filterText) + "\n")
+	}
+	s.WriteString("\n")
+
+	if len(m.filteredPresets) == 0 {
+		if m.filterText != "" {
+			s.WriteString(errorStyle.Render("No presets match filter") + "\n")
+		} else {
+			s.WriteString(infoStyle.Render("No presets available") + "\n")
+		}
+	} else {
+		for i, name := range m.filteredPresets {
+			preset := m.config.Presets[name]
+			isCursor := i == m.presetCursor
+
+			cursor := "  "
+			if isCursor {
+				cursor = "► "
+			}
+
+			// Count available/total servers
+			total := len(preset.Servers)
+			available := 0
+			selected := 0
+			for _, srvName := range preset.Servers {
+				for _, s := range m.servers {
+					if s == srvName {
+						available++
+						if m.multiSelect[srvName] {
+							selected++
+						}
+						break
+					}
+				}
+			}
+
+			// Build display
+			if isCursor {
+				s.WriteString(cursor)
+				s.WriteString(labelStyle.Render(name))
+				s.WriteString(fmt.Sprintf(" (%d/%d available", available, total))
+				if selected > 0 {
+					s.WriteString(fmt.Sprintf(", %d selected", selected))
+				}
+				s.WriteString(")\n")
+				if preset.Description != "" {
+					s.WriteString(valueStyle.Render("      "+preset.Description) + "\n")
+				}
+			} else {
+				s.WriteString(cursor + name)
+				s.WriteString(fmt.Sprintf(" (%d/%d available)\n", available, total))
+				if preset.Description != "" {
+					dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+					s.WriteString(dimStyle.Render("      "+preset.Description) + "\n")
+				}
+			}
+		}
+	}
+
+	// Status and help
+	selectedCount := m.getSelectedCount()
+	s.WriteString("\n" + selectedCountStyle.Render(fmt.Sprintf("Selected: %d servers", selectedCount)))
+	s.WriteString("\n")
+	if m.filtering {
+		s.WriteString(helpStyle.Render("Type to filter • Enter: done • Esc: clear filter"))
+	} else {
+		s.WriteString(helpStyle.Render("Tab: switch tabs • ↑/↓: navigate • Space: toggle preset servers • Enter: install • Esc: quit"))
 	}
 
 	return s.String()

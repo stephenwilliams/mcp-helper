@@ -51,6 +51,22 @@ func TestLoadFromPath_ValidConfig(t *testing.T) {
 		t.Errorf("len(Servers) = %d, want 4", len(cfg.Servers))
 	}
 
+	// Verify presets are loaded
+	if len(cfg.Presets) != 2 {
+		t.Errorf("len(Presets) = %d, want 2", len(cfg.Presets))
+	}
+
+	// Test preset retrieval
+	devTools, err := cfg.GetPreset("dev-tools")
+	if err != nil {
+		t.Errorf("GetPreset(dev-tools) error = %v", err)
+	}
+	if devTools == nil {
+		t.Error("GetPreset(dev-tools) returned nil")
+	} else if len(devTools.Servers) != 2 {
+		t.Errorf("dev-tools preset has %d servers, want 2", len(devTools.Servers))
+	}
+
 	// Test stdio server
 	stdioServer, err := cfg.GetServer("test-stdio")
 	if err != nil {
@@ -300,6 +316,281 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "is nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && err != nil && tt.errMsg != "" {
+				if !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Validate() error = %q, want error containing %q", err.Error(), tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestGetPreset(t *testing.T) {
+	tests := []struct {
+		name       string
+		config     *Config
+		presetName string
+		wantErr    bool
+		wantNil    bool
+	}{
+		{
+			name: "preset found",
+			config: &Config{
+				Presets: map[string]*Preset{
+					"test": {
+						Description: "Test preset",
+						Servers:     []string{"server1", "server2"},
+					},
+				},
+			},
+			presetName: "test",
+			wantErr:    false,
+			wantNil:    false,
+		},
+		{
+			name: "preset not found",
+			config: &Config{
+				Presets: map[string]*Preset{
+					"test": {
+						Description: "Test preset",
+						Servers:     []string{"server1"},
+					},
+				},
+			},
+			presetName: "nonexistent",
+			wantErr:    true,
+			wantNil:    true,
+		},
+		{
+			name: "nil presets map",
+			config: &Config{
+				Presets: nil,
+			},
+			presetName: "test",
+			wantErr:    true,
+			wantNil:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			preset, err := tt.config.GetPreset(tt.presetName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPreset() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if (preset == nil) != tt.wantNil {
+				t.Errorf("GetPreset() preset = %v, wantNil %v", preset, tt.wantNil)
+			}
+		})
+	}
+}
+
+func TestListPresets(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *Config
+		want   []string
+	}{
+		{
+			name: "multiple presets sorted",
+			config: &Config{
+				Presets: map[string]*Preset{
+					"zebra":  {Servers: []string{"s1"}},
+					"alpha":  {Servers: []string{"s2"}},
+					"middle": {Servers: []string{"s3"}},
+				},
+			},
+			want: []string{"alpha", "middle", "zebra"},
+		},
+		{
+			name: "single preset",
+			config: &Config{
+				Presets: map[string]*Preset{
+					"only": {Servers: []string{"s1"}},
+				},
+			},
+			want: []string{"only"},
+		},
+		{
+			name: "nil presets map",
+			config: &Config{
+				Presets: nil,
+			},
+			want: []string{},
+		},
+		{
+			name: "empty presets map",
+			config: &Config{
+				Presets: map[string]*Preset{},
+			},
+			want: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.ListPresets()
+			if len(got) != len(tt.want) {
+				t.Errorf("ListPresets() length = %d, want %d", len(got), len(tt.want))
+				return
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("ListPresets()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestExpandPreset(t *testing.T) {
+	tests := []struct {
+		name       string
+		config     *Config
+		presetName string
+		want       []string
+		wantErr    bool
+		errMsg     string
+	}{
+		{
+			name: "valid preset with existing servers",
+			config: &Config{
+				Servers: map[string]*Server{
+					"server1": {Transport: "stdio", Command: "cmd1"},
+					"server2": {Transport: "stdio", Command: "cmd2"},
+				},
+				Presets: map[string]*Preset{
+					"test": {Servers: []string{"server1", "server2"}},
+				},
+			},
+			presetName: "test",
+			want:       []string{"server1", "server2"},
+			wantErr:    false,
+		},
+		{
+			name: "preset not found",
+			config: &Config{
+				Servers: map[string]*Server{
+					"server1": {Transport: "stdio", Command: "cmd1"},
+				},
+				Presets: map[string]*Preset{},
+			},
+			presetName: "nonexistent",
+			wantErr:    true,
+		},
+		{
+			name: "preset references unknown server",
+			config: &Config{
+				Servers: map[string]*Server{
+					"server1": {Transport: "stdio", Command: "cmd1"},
+				},
+				Presets: map[string]*Preset{
+					"test": {Servers: []string{"server1", "unknown"}},
+				},
+			},
+			presetName: "test",
+			wantErr:    true,
+			errMsg:     "unknown server",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.config.ExpandPreset(tt.presetName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ExpandPreset() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errMsg != "" && err != nil {
+				if !contains(err.Error(), tt.errMsg) {
+					t.Errorf("ExpandPreset() error = %q, want containing %q", err.Error(), tt.errMsg)
+				}
+				return
+			}
+			if !tt.wantErr {
+				if len(got) != len(tt.want) {
+					t.Errorf("ExpandPreset() length = %d, want %d", len(got), len(tt.want))
+					return
+				}
+				for i := range got {
+					if got[i] != tt.want[i] {
+						t.Errorf("ExpandPreset()[%d] = %q, want %q", i, got[i], tt.want[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestValidatePresets(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  *Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid config with presets",
+			config: &Config{
+				Servers: map[string]*Server{
+					"server1": {Transport: "stdio", Command: "/bin/test"},
+					"server2": {Transport: "stdio", Command: "/bin/test2"},
+				},
+				Presets: map[string]*Preset{
+					"test": {Servers: []string{"server1", "server2"}},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "nil preset",
+			config: &Config{
+				Servers: map[string]*Server{
+					"server1": {Transport: "stdio", Command: "/bin/test"},
+				},
+				Presets: map[string]*Preset{
+					"test": nil,
+				},
+			},
+			wantErr: true,
+			errMsg:  "is nil",
+		},
+		{
+			name: "preset with empty servers",
+			config: &Config{
+				Servers: map[string]*Server{
+					"server1": {Transport: "stdio", Command: "/bin/test"},
+				},
+				Presets: map[string]*Preset{
+					"test": {Servers: []string{}},
+				},
+			},
+			wantErr: true,
+			errMsg:  "has no servers",
+		},
+		{
+			name: "preset references unknown server",
+			config: &Config{
+				Servers: map[string]*Server{
+					"server1": {Transport: "stdio", Command: "/bin/test"},
+				},
+				Presets: map[string]*Preset{
+					"test": {Servers: []string{"server1", "nonexistent"}},
+				},
+			},
+			wantErr: true,
+			errMsg:  "references unknown server",
 		},
 	}
 
