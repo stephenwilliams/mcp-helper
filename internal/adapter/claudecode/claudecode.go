@@ -70,10 +70,12 @@ func (c *ClaudeCode) Name() string {
 // It supports both stdio and HTTP transports and handles environment variable configuration.
 //
 // For stdio transport, the command format is:
-//   claude mcp add --scope <scope> <name> [-e KEY=val]... -- <command> [args...]
+//
+//	claude mcp add --scope <scope> <name> [-e KEY=val]... -- <command> [args...]
 //
 // For HTTP transport, the command format is:
-//   claude mcp add --transport http --scope <scope> <name> <url>
+//
+//	claude mcp add --transport http --scope <scope> <name> <url>
 //
 // Parameters:
 //   - name: The unique identifier for the server

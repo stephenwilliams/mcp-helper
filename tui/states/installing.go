@@ -81,9 +81,9 @@ func (h *InstallingHandler) UpdateComplete(p CompleteUpdateParams) CompleteUpdat
 
 // InstallingViewParams contains parameters for rendering installing state
 type InstallingViewParams struct {
-	Selected     string
-	Scope        adapter.Scope
-	AdapterName  string
+	Selected    string
+	Scope       adapter.Scope
+	AdapterName string
 }
 
 // ViewInstalling renders the installing state
@@ -100,10 +100,10 @@ func (h *InstallingHandler) ViewInstalling(p InstallingViewParams) string {
 
 // CompleteViewParams contains parameters for rendering complete state
 type CompleteViewParams struct {
-	Selected    string
-	Scope       adapter.Scope
-	Err         error
-	InstallMsg  string
+	Selected   string
+	Scope      adapter.Scope
+	Err        error
+	InstallMsg string
 }
 
 // ViewComplete renders the complete state
@@ -112,11 +112,11 @@ func (h *InstallingHandler) ViewComplete(p CompleteViewParams) string {
 	s.WriteString(h.titleStyle.Render("Installation Complete") + "\n\n")
 
 	if p.Err != nil {
-		s.WriteString(h.errorStyle.Render("✗ " + p.InstallMsg) + "\n\n")
+		s.WriteString(h.errorStyle.Render("✗ "+p.InstallMsg) + "\n\n")
 		s.WriteString(h.labelStyle.Render("Details:") + "\n")
 		s.WriteString(h.normalStyle.Render(p.Err.Error()) + "\n")
 	} else {
-		s.WriteString(h.successStyle.Render("✓ " + p.InstallMsg) + "\n\n")
+		s.WriteString(h.successStyle.Render("✓ "+p.InstallMsg) + "\n\n")
 		s.WriteString(h.labelStyle.Render("Server: ") + h.valueStyle.Render(p.Selected) + "\n")
 		s.WriteString(h.labelStyle.Render("Scope: ") + h.valueStyle.Render(string(p.Scope)) + "\n")
 	}

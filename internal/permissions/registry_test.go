@@ -63,11 +63,11 @@ func TestGetWithDefault(t *testing.T) {
 	})
 
 	tests := []struct {
-		name         string
-		flagName     string
-		defaultName  string
-		wantName     string
-		wantErr      bool
+		name        string
+		flagName    string
+		defaultName string
+		wantName    string
+		wantErr     bool
 	}{
 		{
 			name:        "use flag name",
@@ -142,8 +142,8 @@ func (m *mockAdapter) Name() string { return m.name }
 func (m *mockAdapter) GetMCPServers() ([]mcp.ServerConfig, error) {
 	return nil, nil
 }
-func (m *mockAdapter) GetSettingsPaths() []SettingsPath { return nil }
-func (m *mockAdapter) LoadPermissions(path string) ([]PermissionRule, error) { return nil, nil }
+func (m *mockAdapter) GetSettingsPaths() []SettingsPath                          { return nil }
+func (m *mockAdapter) LoadPermissions(path string) ([]PermissionRule, error)     { return nil, nil }
 func (m *mockAdapter) SavePermissions(path string, rules []PermissionRule) error { return nil }
 func (m *mockAdapter) FormatToolRule(serverName, toolName string) PermissionRule {
 	return FormatMCPToolRule(serverName, toolName)

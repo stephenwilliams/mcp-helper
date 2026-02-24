@@ -29,23 +29,23 @@ type installResult struct {
 
 // BulkConfigureModel handles sequential configuration and installation of multiple servers
 type BulkConfigureModel struct {
-	servers       []string              // selected server names to configure
-	currentIndex  int                   // which server is being configured
-	config        *config.Config        // server registry config
-	adapter       adapter.Adapter       // adapter for installation
-	installer     ServerInstaller       // service layer for installation
-	scope         adapter.Scope         // installation scope
-	envKeys       []string              // env var keys for current server
-	envValues     map[string]string     // env var values for current server
-	currentField  int                   // current field in configuration form
-	textInput     string                // current text input value
-	cursorPos     int                   // cursor position in text input
-	results       []installResult       // installation results for all servers
-	installing    bool                  // whether currently installing
-	complete      bool                  // whether all servers are done
-	confirmCancel bool                  // whether showing cancel confirmation
-	width         int                   // terminal width
-	height        int                   // terminal height
+	servers       []string          // selected server names to configure
+	currentIndex  int               // which server is being configured
+	config        *config.Config    // server registry config
+	adapter       adapter.Adapter   // adapter for installation
+	installer     ServerInstaller   // service layer for installation
+	scope         adapter.Scope     // installation scope
+	envKeys       []string          // env var keys for current server
+	envValues     map[string]string // env var values for current server
+	currentField  int               // current field in configuration form
+	textInput     string            // current text input value
+	cursorPos     int               // cursor position in text input
+	results       []installResult   // installation results for all servers
+	installing    bool              // whether currently installing
+	complete      bool              // whether all servers are done
+	confirmCancel bool              // whether showing cancel confirmation
+	width         int               // terminal width
+	height        int               // terminal height
 }
 
 // NewBulkConfigureModel creates a new bulk configuration model
@@ -331,7 +331,7 @@ func (m BulkConfigureModel) viewConfiguring() string {
 
 		if i == m.currentField {
 			// Current field - highlight
-			s.WriteString(selectedStyle.Render("► " + key) + required + "\n")
+			s.WriteString(selectedStyle.Render("► "+key) + required + "\n")
 		} else {
 			// Other fields
 			s.WriteString("  " + labelStyle.Render(key) + required + "\n")
@@ -525,4 +525,3 @@ func (m BulkConfigureModel) installCurrentServer() tea.Cmd {
 		}
 	}
 }
-

@@ -17,14 +17,14 @@ import (
 
 var (
 	// Exploration options
-	seeds       = flag.Int("seeds", 1, "Number of exploration episodes to run")
-	steps       = flag.Int("steps", 500, "Maximum steps per episode")
-	timeout     = flag.Duration("timeout", 5*time.Minute, "Overall timeout for exploration")
-	seed        = flag.Int64("seed", 0, "Starting seed (0 = random)")
+	seeds   = flag.Int("seeds", 1, "Number of exploration episodes to run")
+	steps   = flag.Int("steps", 500, "Maximum steps per episode")
+	timeout = flag.Duration("timeout", 5*time.Minute, "Overall timeout for exploration")
+	seed    = flag.Int64("seed", 0, "Starting seed (0 = random)")
 
 	// Terminal size
-	cols        = flag.Int("cols", 120, "Terminal columns")
-	rows        = flag.Int("rows", 40, "Terminal rows")
+	cols = flag.Int("cols", 120, "Terminal columns")
+	rows = flag.Int("rows", 40, "Terminal rows")
 
 	// Output options
 	artifactDir = flag.String("artifacts", "./artifacts", "Directory for failure artifacts")
@@ -32,10 +32,10 @@ var (
 	minimize    = flag.Bool("minimize", true, "Attempt to minimize failure repros")
 
 	// Replay mode
-	replayFile  = flag.String("replay", "", "Replay a repro file instead of exploring")
+	replayFile = flag.String("replay", "", "Replay a repro file instead of exploring")
 
 	// Config file
-	configFile  = flag.String("config", "", "Path to MCP helper config file")
+	configFile = flag.String("config", "", "Path to MCP helper config file")
 )
 
 func main() {

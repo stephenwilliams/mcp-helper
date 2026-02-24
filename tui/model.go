@@ -30,31 +30,31 @@ type installCompleteMsg struct {
 
 // Model represents the TUI application state
 type Model struct {
-	state         State
-	config        *config.Config
-	adapter       adapter.Adapter
-	installer     ServerInstaller   // service layer for installation
-	servers       []string          // sorted server names
-	cursor        int
-	selected      string // selected server name
-	scope         adapter.Scope
-	envValues     map[string]string
-	envKeys       []string // sorted env var keys for iteration
-	currentField  int      // current field in configuration form
-	textInput     string   // current text input value
-	cursorPos     int      // cursor position in text input
-	err           error
-	installMsg    string   // installation status message
-	width         int
-	height        int
+	state        State
+	config       *config.Config
+	adapter      adapter.Adapter
+	installer    ServerInstaller // service layer for installation
+	servers      []string        // sorted server names
+	cursor       int
+	selected     string // selected server name
+	scope        adapter.Scope
+	envValues    map[string]string
+	envKeys      []string // sorted env var keys for iteration
+	currentField int      // current field in configuration form
+	textInput    string   // current text input value
+	cursorPos    int      // cursor position in text input
+	err          error
+	installMsg   string // installation status message
+	width        int
+	height       int
 
 	// Multi-select mode fields
-	multiSelectMode  bool              // whether multi-select is enabled
-	multiSelect      map[string]bool   // tracks selected servers
-	filterText       string            // current filter text
-	filteredServers  []string          // servers matching filter
-	filtering        bool              // whether in filter input mode
-	allInstalled     bool              // true when all servers from config are already installed
+	multiSelectMode bool            // whether multi-select is enabled
+	multiSelect     map[string]bool // tracks selected servers
+	filterText      string          // current filter text
+	filteredServers []string        // servers matching filter
+	filtering       bool            // whether in filter input mode
+	allInstalled    bool            // true when all servers from config are already installed
 
 	// Tab state (only used in multiSelectMode)
 	activeTab       int      // 0 = servers, 1 = presets
@@ -185,7 +185,6 @@ func (m *Model) updatePresetFilter() {
 	m.presetCursor = result.Cursor
 }
 
-
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
 	return nil
@@ -240,9 +239,9 @@ func (m Model) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		FilteredServers: m.filteredServers,
 		FilteredPresets: m.filteredPresets,
 		MultiSelect:     m.multiSelect,
-		Config:  m.config,
-		Adapter: m.adapter,
-		Scope:   m.scope,
+		Config:          m.config,
+		Adapter:         m.adapter,
+		Scope:           m.scope,
 	}
 
 	result := m.browsingHandler.Update(params, m.updateFilter, m.updatePresetFilter)

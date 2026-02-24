@@ -21,13 +21,13 @@ type MultiSelectModel struct {
 
 // Styles
 var (
-	titleStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
-	cursorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
-	checkedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	titleStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
+	cursorStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
+	checkedStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
 	uncheckedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
-	ssoStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-	helpStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	readOnlyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	ssoStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	helpStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	readOnlyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
 	readWriteStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 )
 

@@ -374,6 +374,32 @@ Environment variables are automatically detected as secrets based on name patter
 
 Secret values are hidden during interactive prompts.
 
+## Architecture
+
+The codebase follows a layered architecture:
+
+```
+cmd/                    # CLI commands (Cobra)
+tui/                    # Terminal UI (Bubble Tea)
+  ├── states/           # State-specific handlers (browsing, configuring, etc.)
+  └── components/       # Reusable UI components (textinput, viewport)
+internal/
+  ├── app/              # Application/service layer (use cases)
+  ├── adapter/          # Infrastructure adapters (Claude Code, OpenCode)
+  │   └── mock/         # Shared mock adapter for testing
+  ├── config/           # Configuration loading
+  ├── env/              # Environment variable handling
+  ├── mcp/              # MCP client
+  └── permissions/      # Permission management
+```
+
+### Key Design Patterns
+
+- **Service Layer**: Business logic lives in `internal/app/`, not in TUI models
+- **State Handlers**: TUI states are extracted to `tui/states/` for separation of concerns
+- **Shared Components**: Reusable UI components in `tui/components/`
+- **Mock Adapter**: `internal/adapter/mock/` provides test doubles with `DefaultTestConfig()`
+
 ## Development
 
 ### Requirements

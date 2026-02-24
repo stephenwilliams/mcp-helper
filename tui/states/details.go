@@ -12,13 +12,13 @@ import (
 // DetailsHandler handles the details state logic
 type DetailsHandler struct {
 	// Styles
-	titleStyle   lipgloss.Style
-	labelStyle   lipgloss.Style
-	valueStyle   lipgloss.Style
-	normalStyle  lipgloss.Style
-	infoStyle    lipgloss.Style
-	helpStyle    lipgloss.Style
-	errorStyle   lipgloss.Style
+	titleStyle  lipgloss.Style
+	labelStyle  lipgloss.Style
+	valueStyle  lipgloss.Style
+	normalStyle lipgloss.Style
+	infoStyle   lipgloss.Style
+	helpStyle   lipgloss.Style
+	errorStyle  lipgloss.Style
 }
 
 // NewDetailsHandler creates a new details state handler with styles
@@ -43,12 +43,12 @@ type DetailsUpdateParams struct {
 
 // DetailsUpdateResult contains the result of updating details state
 type DetailsUpdateResult struct {
-	ShouldQuit     bool
-	TransitionTo   string // "browsing", "configuring", "installing", or ""
-	EnvKeys        []string
-	CurrentField   int
-	TextInput      string
-	CursorPos      int
+	ShouldQuit   bool
+	TransitionTo string // "browsing", "configuring", "installing", or ""
+	EnvKeys      []string
+	CurrentField int
+	TextInput    string
+	CursorPos    int
 }
 
 // Update handles input in the details state

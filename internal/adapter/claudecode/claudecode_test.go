@@ -169,12 +169,12 @@ func TestDryRun_StdioTransport(t *testing.T) {
 
 func TestDryRun_HttpTransport(t *testing.T) {
 	tests := []struct {
-		name         string
-		serverName   string
-		server       *config.Server
-		scope        adapter.Scope
-		env          map[string]string
-		wantContains []string
+		name           string
+		serverName     string
+		server         *config.Server
+		scope          adapter.Scope
+		env            map[string]string
+		wantContains   []string
 		wantNotContain []string
 	}{
 		{
@@ -290,9 +290,9 @@ func TestDryRun_HttpTransport(t *testing.T) {
 					"Authorization": "Bearer token123",
 				},
 			},
-			scope:        adapter.ScopeUser,
-			env:          nil,
-			wantContains: []string{"mcp", "add", "node"},
+			scope:          adapter.ScopeUser,
+			env:            nil,
+			wantContains:   []string{"mcp", "add", "node"},
 			wantNotContain: []string{"-H", "Authorization"},
 		},
 	}

@@ -9,7 +9,7 @@ import (
 
 // Report generates human-readable exploration reports.
 type Report struct {
-	results    []*ExplorationResult
+	results       []*ExplorationResult
 	artifactPaths map[int64]string // seed -> artifact path
 }
 

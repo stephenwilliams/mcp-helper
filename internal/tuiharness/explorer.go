@@ -7,15 +7,15 @@ import (
 
 // ExplorerConfig configures the autonomous exploration.
 type ExplorerConfig struct {
-	Seed            int64         // Random seed for reproducibility
-	MaxSteps        int           // Maximum steps per episode
-	StuckThreshold  int           // Actions without screen change before "stuck"
-	ActionSpace     []Action      // Available actions
-	TextActions     []Action      // Text input actions (used occasionally)
-	TextProbability float64       // Probability of choosing text action (0-1)
-	ResizeProbability float64     // Probability of resize (0-1)
-	WaitAfterAction time.Duration // Wait time after each action
-	EnableMinimize  bool          // Attempt to minimize failure repros
+	Seed              int64         // Random seed for reproducibility
+	MaxSteps          int           // Maximum steps per episode
+	StuckThreshold    int           // Actions without screen change before "stuck"
+	ActionSpace       []Action      // Available actions
+	TextActions       []Action      // Text input actions (used occasionally)
+	TextProbability   float64       // Probability of choosing text action (0-1)
+	ResizeProbability float64       // Probability of resize (0-1)
+	WaitAfterAction   time.Duration // Wait time after each action
+	EnableMinimize    bool          // Attempt to minimize failure repros
 }
 
 // DefaultExplorerConfig returns default exploration settings.
@@ -35,13 +35,13 @@ func DefaultExplorerConfig() ExplorerConfig {
 
 // Explorer performs autonomous exploration of a TUI.
 type Explorer struct {
-	config       ExplorerConfig
-	rng          *rand.Rand
+	config        ExplorerConfig
+	rng           *rand.Rand
 	visitedHashes map[string]int // hash -> visit count
-	history      []Step
-	screens      []*Screen
-	stuckCount   int
-	totalSteps   int
+	history       []Step
+	screens       []*Screen
+	stuckCount    int
+	totalSteps    int
 }
 
 // Step records a single exploration step.
@@ -59,16 +59,16 @@ type Step struct {
 
 // ExplorationResult contains the results of an exploration run.
 type ExplorationResult struct {
-	Seed          int64
-	TotalSteps    int
-	UniqueStates  int
-	Steps         []Step
-	Screens       []*Screen
-	Failure       *OracleResult
-	FailureStep   int
-	Duration      time.Duration
-	ActionCounts  map[string]int
-	StuckEvents   int
+	Seed         int64
+	TotalSteps   int
+	UniqueStates int
+	Steps        []Step
+	Screens      []*Screen
+	Failure      *OracleResult
+	FailureStep  int
+	Duration     time.Duration
+	ActionCounts map[string]int
+	StuckEvents  int
 }
 
 // NewExplorer creates a new explorer with the given config.

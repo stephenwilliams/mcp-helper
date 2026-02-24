@@ -69,24 +69,24 @@ func (k Key) String() string {
 
 // Common key definitions for easy use.
 var (
-	KeyUp       = Key{Type: tea.KeyUp}
-	KeyDown     = Key{Type: tea.KeyDown}
-	KeyLeft     = Key{Type: tea.KeyLeft}
-	KeyRight    = Key{Type: tea.KeyRight}
-	KeyEnter    = Key{Type: tea.KeyEnter}
-	KeyEsc      = Key{Type: tea.KeyEsc}
-	KeyTab      = Key{Type: tea.KeyTab}
-	KeyShiftTab = Key{Type: tea.KeyShiftTab}
+	KeyUp        = Key{Type: tea.KeyUp}
+	KeyDown      = Key{Type: tea.KeyDown}
+	KeyLeft      = Key{Type: tea.KeyLeft}
+	KeyRight     = Key{Type: tea.KeyRight}
+	KeyEnter     = Key{Type: tea.KeyEnter}
+	KeyEsc       = Key{Type: tea.KeyEsc}
+	KeyTab       = Key{Type: tea.KeyTab}
+	KeyShiftTab  = Key{Type: tea.KeyShiftTab}
 	KeyBackspace = Key{Type: tea.KeyBackspace}
-	KeySpace    = Key{Type: tea.KeySpace}
-	KeyCtrlC    = Key{Type: tea.KeyCtrlC}
-	KeyCtrlR    = Key{Type: tea.KeyCtrlR}
-	KeyCtrlA    = Key{Type: tea.KeyCtrlA}
-	KeyCtrlE    = Key{Type: tea.KeyCtrlE}
-	KeyPgUp     = Key{Type: tea.KeyPgUp}
-	KeyPgDown   = Key{Type: tea.KeyPgDown}
-	KeyHome     = Key{Type: tea.KeyHome}
-	KeyEnd      = Key{Type: tea.KeyEnd}
+	KeySpace     = Key{Type: tea.KeySpace}
+	KeyCtrlC     = Key{Type: tea.KeyCtrlC}
+	KeyCtrlR     = Key{Type: tea.KeyCtrlR}
+	KeyCtrlA     = Key{Type: tea.KeyCtrlA}
+	KeyCtrlE     = Key{Type: tea.KeyCtrlE}
+	KeyPgUp      = Key{Type: tea.KeyPgUp}
+	KeyPgDown    = Key{Type: tea.KeyPgDown}
+	KeyHome      = Key{Type: tea.KeyHome}
+	KeyEnd       = Key{Type: tea.KeyEnd}
 )
 
 // Rune creates a Key for a single character.

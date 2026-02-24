@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stephenwilliams/mcp-helper/internal/mcp"
 	"github.com/stephenwilliams/mcp-helper/internal/permissions"
@@ -53,9 +53,9 @@ type ToolsApproveModel struct {
 	servers       []mcp.ServerInfo
 	cursor        int
 	viewport      *components.ViewportManager // Viewport for scrolling
-	expanded      map[string]bool              // server name -> expanded
-	selected      map[string]SelectType        // server -> none/some/all(wildcard)
-	selectedTools map[string]map[string]bool   // server -> tool -> selected
+	expanded      map[string]bool             // server name -> expanded
+	selected      map[string]SelectType       // server -> none/some/all(wildcard)
+	selectedTools map[string]map[string]bool  // server -> tool -> selected
 	targetFile    string
 	targetOptions []permissions.SettingsPath
 	targetCursor  int
@@ -65,7 +65,7 @@ type ToolsApproveModel struct {
 	width         int
 	height        int
 	spinner       spinner.Model
-	showDetail    bool   // Show tool detail dialog
+	showDetail    bool      // Show tool detail dialog
 	detailTool    *mcp.Tool // Tool being shown in detail
 	detailServer  string    // Server name of tool being shown
 
@@ -929,7 +929,7 @@ func (m *ToolsApproveModel) generatePreview() string {
 	}
 
 	for _, rule := range newRules {
-		s.WriteString(successStyle.Render("+     \""+string(rule)+"\",\n"))
+		s.WriteString(successStyle.Render("+     \"" + string(rule) + "\",\n"))
 	}
 
 	s.WriteString("    ]\n")

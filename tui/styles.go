@@ -4,12 +4,12 @@ import "github.com/charmbracelet/lipgloss"
 
 var (
 	// Color scheme
-	colorCyan    = lipgloss.Color("86")
-	colorGray    = lipgloss.Color("240")
-	colorWhite   = lipgloss.Color("255")
-	colorGreen   = lipgloss.Color("42")
-	colorRed     = lipgloss.Color("196")
-	colorYellow  = lipgloss.Color("226")
+	colorCyan   = lipgloss.Color("86")
+	colorGray   = lipgloss.Color("240")
+	colorWhite  = lipgloss.Color("255")
+	colorGreen  = lipgloss.Color("42")
+	colorRed    = lipgloss.Color("196")
+	colorYellow = lipgloss.Color("226")
 
 	// Title style
 	titleStyle = lipgloss.NewStyle().
@@ -106,9 +106,9 @@ var (
 
 	// Tab styles for preset/server tabs
 	tabActiveStyle = lipgloss.NewStyle().
-				Foreground(colorCyan).
-				Bold(true).
-				Background(lipgloss.Color("236"))
+			Foreground(colorCyan).
+			Bold(true).
+			Background(lipgloss.Color("236"))
 
 	tabInactiveStyle = lipgloss.NewStyle().
 				Foreground(colorGray)

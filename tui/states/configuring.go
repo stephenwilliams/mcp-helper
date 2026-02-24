@@ -174,7 +174,7 @@ func (h *ConfiguringHandler) View(p ConfiguringViewParams) string {
 
 		if i == p.CurrentField {
 			// Current field - highlight
-			s.WriteString(h.selectedStyle.Render("► " + key) + required + "\n")
+			s.WriteString(h.selectedStyle.Render("► "+key) + required + "\n")
 		} else {
 			// Other fields
 			s.WriteString("  " + h.labelStyle.Render(key) + required + "\n")

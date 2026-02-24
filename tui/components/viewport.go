@@ -2,9 +2,9 @@ package components
 
 // ViewportManager handles scrolling/viewport for lists
 type ViewportManager struct {
-	Start    int // First visible row
-	Height   int // Terminal height
-	Reserved int // Lines reserved for header/footer
+	Start     int // First visible row
+	Height    int // Terminal height
+	Reserved  int // Lines reserved for header/footer
 	MinHeight int // Minimum viewport height
 }
 

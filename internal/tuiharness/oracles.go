@@ -136,11 +136,11 @@ func CorruptionOracle(screen *Screen, history []*Screen) *OracleResult {
 
 // FocusMarkerOracle detects when focus/selection markers disappear unexpectedly.
 type FocusMarkerOracle struct {
-	markers        []string
-	markerRegexes  []*regexp.Regexp
-	sawMarker      bool
-	missingCount   int
-	threshold      int
+	markers       []string
+	markerRegexes []*regexp.Regexp
+	sawMarker     bool
+	missingCount  int
+	threshold     int
 }
 
 // NewFocusMarkerOracle creates a focus marker oracle.

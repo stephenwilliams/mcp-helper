@@ -163,11 +163,11 @@ func TestCollectEnvVars_NonInteractive(t *testing.T) {
 	os.Setenv("TEST_FROM_OS", "os_value")
 
 	tests := []struct {
-		name        string
-		server      *config.Server
-		provided    map[string]string
-		wantErr     bool
-		wantEnv     map[string]string
+		name     string
+		server   *config.Server
+		provided map[string]string
+		wantErr  bool
+		wantEnv  map[string]string
 	}{
 		{
 			name: "priority: provided > os.Getenv > default",

@@ -67,9 +67,9 @@ type BrowsingUpdateParams struct {
 	FilteredServers []string
 	FilteredPresets []string
 	MultiSelect     map[string]bool
-	Config  *config.Config
-	Adapter adapter.Adapter
-	Scope   adapter.Scope
+	Config          *config.Config
+	Adapter         adapter.Adapter
+	Scope           adapter.Scope
 }
 
 // BrowsingUpdateResult contains the result of updating browsing state
@@ -351,11 +351,11 @@ func (h *BrowsingHandler) View(p BrowsingViewParams) string {
 		serverTabLabel := "Servers"
 		presetTabLabel := "Presets"
 		if p.ActiveTab == 0 {
-			s.WriteString(h.tabActiveStyle.Render(" "+serverTabLabel+" "))
-			s.WriteString(h.tabInactiveStyle.Render(" "+presetTabLabel+" "))
+			s.WriteString(h.tabActiveStyle.Render(" " + serverTabLabel + " "))
+			s.WriteString(h.tabInactiveStyle.Render(" " + presetTabLabel + " "))
 		} else {
-			s.WriteString(h.tabInactiveStyle.Render(" "+serverTabLabel+" "))
-			s.WriteString(h.tabActiveStyle.Render(" "+presetTabLabel+" "))
+			s.WriteString(h.tabInactiveStyle.Render(" " + serverTabLabel + " "))
+			s.WriteString(h.tabActiveStyle.Render(" " + presetTabLabel + " "))
 		}
 		s.WriteString("\n")
 	}
