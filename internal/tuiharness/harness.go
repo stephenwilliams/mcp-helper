@@ -157,7 +157,7 @@ func (h *Harness) Press(keys ...Key) error {
 	}
 
 	for _, key := range keys {
-		h.tm.Send(tea.KeyMsg(key.ToTeaKey()))
+		h.tm.Send(key.ToTeaKey())
 	}
 
 	return nil

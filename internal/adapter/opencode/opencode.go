@@ -91,7 +91,9 @@ func (o *OpenCode) AddServer(name string, server *config.Server, scope adapter.S
 	// Read existing config or create new
 	var existingConfig OpenCodeConfig
 	if data, err := os.ReadFile(configPath); err == nil {
-		json.Unmarshal(data, &existingConfig)
+		if err := json.Unmarshal(data, &existingConfig); err != nil {
+			existingConfig = OpenCodeConfig{} // Start fresh on malformed config
+		}
 	}
 
 	if existingConfig.MCP == nil {

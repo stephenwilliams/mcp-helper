@@ -73,7 +73,7 @@ func (c *Client) ListToolsStdio(ctx context.Context, command string, args []stri
 	}
 
 	// Discard stderr to prevent blocking (could log it instead)
-	go io.Copy(io.Discard, stderr)
+	go func() { _, _ = io.Copy(io.Discard, stderr) }()
 
 	// Ensure cleanup
 	defer func() {
@@ -234,7 +234,7 @@ func (c *Client) gracefulShutdown(cmd *exec.Cmd) {
 		return
 	case <-time.After(GracePeriod):
 		// Force kill after grace period
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		<-done // Wait for kill to complete
 	}
 }
@@ -305,7 +305,7 @@ func (c *Client) ListToolsHTTP(ctx context.Context, url string, headers map[stri
 	}
 
 	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read initialize response: %w", err)
 	}
@@ -334,7 +334,7 @@ func (c *Client) ListToolsHTTP(ctx context.Context, url string, headers map[stri
 	if err != nil {
 		return nil, fmt.Errorf("initialized notification failed: %w", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Step 3: List tools
 	reqID = 2
@@ -349,7 +349,7 @@ func (c *Client) ListToolsHTTP(ctx context.Context, url string, headers map[stri
 	if err != nil {
 		return nil, fmt.Errorf("tools/list request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
@@ -443,40 +443,4 @@ func buildEnvSlice(envMap map[string]string) []string {
 	}
 
 	return env
-}
-
-// Helper to read JSON-RPC messages with timeout
-type messageReader struct {
-	decoder *json.Decoder
-	mu      sync.Mutex
-}
-
-func newMessageReader(r io.Reader) *messageReader {
-	return &messageReader{
-		decoder: json.NewDecoder(r),
-	}
-}
-
-func (mr *messageReader) readMessage(ctx context.Context) (*JSONRPCResponse, error) {
-	type result struct {
-		resp *JSONRPCResponse
-		err  error
-	}
-
-	ch := make(chan result, 1)
-	go func() {
-		mr.mu.Lock()
-		defer mr.mu.Unlock()
-
-		var resp JSONRPCResponse
-		err := mr.decoder.Decode(&resp)
-		ch <- result{&resp, err}
-	}()
-
-	select {
-	case res := <-ch:
-		return res.resp, res.err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
 }

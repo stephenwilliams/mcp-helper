@@ -73,15 +73,6 @@ var (
 				Foreground(colorYellow).
 				Bold(true)
 
-	// Description styles
-	descriptionStyle = lipgloss.NewStyle().
-				Foreground(colorWhite).
-				PaddingLeft(4)
-
-	descriptionDimStyle = lipgloss.NewStyle().
-				Foreground(colorGray).
-				PaddingLeft(4)
-
 	// Checkbox styles for multi-select
 	checkboxCheckedStyle = lipgloss.NewStyle().
 				Foreground(colorGreen).
@@ -93,16 +84,6 @@ var (
 	selectedCountStyle = lipgloss.NewStyle().
 				Foreground(colorCyan).
 				Bold(true)
-
-	bulkProgressStyle = lipgloss.NewStyle().
-				Foreground(colorYellow).
-				Bold(true)
-
-	resultSuccessStyle = lipgloss.NewStyle().
-				Foreground(colorGreen)
-
-	resultFailureStyle = lipgloss.NewStyle().
-				Foreground(colorRed)
 
 	// Tab styles for preset/server tabs
 	tabActiveStyle = lipgloss.NewStyle().

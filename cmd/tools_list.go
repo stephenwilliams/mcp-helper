@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -128,7 +127,7 @@ func runToolsList(cmd *cobra.Command, args []string) error {
 func outputToolsTable(results []mcp.ServerInfo) error {
 	// Print summary table
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SERVER\tSCOPE\tTOOLS\tSTATUS")
+	_, _ = fmt.Fprintln(w, "SERVER\tSCOPE\tTOOLS\tSTATUS")
 
 	for _, result := range results {
 		status := "ok"
@@ -137,9 +136,9 @@ func outputToolsTable(results []mcp.ServerInfo) error {
 			status = fmt.Sprintf("error: %s", result.Error.Error())
 			toolCount = "-"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", result.Name, result.Scope, toolCount, status)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", result.Name, result.Scope, toolCount, status)
 	}
-	w.Flush()
+	_ = w.Flush()
 
 	// Print tool details
 	fmt.Println("\nTools:")
@@ -217,37 +216,4 @@ func outputToolsListJSON(results []mcp.ServerInfo, cached bool) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(output)
-}
-
-// toolNameForDisplay returns a formatted tool name for display
-func toolNameForDisplay(serverName, toolName string) string {
-	return fmt.Sprintf("%s.%s", serverName, toolName)
-}
-
-// truncateString truncates a string to maxLen, adding ellipsis if needed
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
-}
-
-// formatErrorMessage formats an error message for display
-func formatErrorMessage(err error) string {
-	msg := err.Error()
-	// Simplify common error messages
-	if strings.Contains(msg, "context deadline exceeded") {
-		return "timeout"
-	}
-	if strings.Contains(msg, "connection refused") {
-		return "connection refused"
-	}
-	if strings.Contains(msg, "no such file") {
-		return "command not found"
-	}
-	// Truncate long error messages
-	return truncateString(msg, 60)
 }

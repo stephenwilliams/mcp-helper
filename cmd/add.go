@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stephenwilliams/mcp-helper/internal/adapter"
 	"github.com/stephenwilliams/mcp-helper/internal/app"
+	"github.com/stephenwilliams/mcp-helper/internal/config"
 	"github.com/stephenwilliams/mcp-helper/internal/env"
 	"github.com/stephenwilliams/mcp-helper/internal/template"
 	"github.com/stephenwilliams/mcp-helper/tui"
@@ -58,7 +59,7 @@ func init() {
 	addCmd.Flags().BoolVar(&addNoPrompt, "no-prompt", false, "Fail if env vars missing instead of prompting")
 
 	// Register completions
-	addCmd.RegisterFlagCompletionFunc("scope", ScopeCompletion)
+	_ = addCmd.RegisterFlagCompletionFunc("scope", ScopeCompletion)
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
@@ -70,136 +71,187 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	// NO ARGS: Launch fuzzy select TUI
 	if len(args) == 0 {
-		// Determine scope
-		parsedScope, err := adapter.ParseScope(resolveScope(addScope, cfg))
-		if err != nil {
-			return err
-		}
-
-		// Get adapter
-		adptr, err := GetAdapter()
-		if err != nil {
-			return err
-		}
-
-		// Launch TUI (handles everything including installation)
-		installed, err := tui.RunFuzzySelect(cfg, adptr, parsedScope)
-		if err != nil {
-			return err
-		}
-		if len(installed) == 0 {
-			fmt.Println("No servers installed.")
-		}
-		return nil
+		return runAddInteractive(cfg)
 	}
 
 	// SINGLE ARG: Check if it's a preset (p: prefix)
 	serverName := args[0]
-
-	// Handle preset expansion
 	if strings.HasPrefix(serverName, "p:") {
 		presetName := strings.TrimPrefix(serverName, "p:")
-		presetServers, err := cfg.ExpandPreset(presetName)
-		if err != nil {
-			return fmt.Errorf("preset '%s' not found in configuration", presetName)
-		}
+		return runAddPreset(cfg, presetName)
+	}
 
-		// Determine scope
-		parsedScope, err := adapter.ParseScope(resolveScope(addScope, cfg))
+	// Single server
+	return runAddSingle(cfg, serverName)
+}
+
+// runAddInteractive launches the fuzzy select TUI for server selection
+func runAddInteractive(cfg *config.Config) error {
+	// Determine scope
+	parsedScope, err := adapter.ParseScope(resolveScope(addScope, cfg))
+	if err != nil {
+		return err
+	}
+
+	// Get adapter
+	adptr, err := GetAdapter()
+	if err != nil {
+		return err
+	}
+
+	// Launch TUI (handles everything including installation)
+	installed, err := tui.RunFuzzySelect(cfg, adptr, parsedScope)
+	if err != nil {
+		return err
+	}
+	if len(installed) == 0 {
+		fmt.Println("No servers installed.")
+	}
+	return nil
+}
+
+// runAddPreset handles preset expansion and installation
+func runAddPreset(cfg *config.Config, presetName string) error {
+	// Expand preset
+	presetServers, err := expandPreset(cfg, presetName)
+	if err != nil {
+		return err
+	}
+
+	// Determine scope
+	parsedScope, err := adapter.ParseScope(resolveScope(addScope, cfg))
+	if err != nil {
+		return err
+	}
+
+	// Get adapter
+	adptr, err := GetAdapter()
+	if err != nil {
+		return err
+	}
+
+	// Filter out already-installed servers
+	availableServers := filterAvailableServers(presetServers, adptr, parsedScope)
+	if len(availableServers) == 0 {
+		fmt.Println("All servers in preset are already installed.")
+		return nil
+	}
+
+	// Handle --dry-run
+	if addDryRun {
+		return presetDryRun(cfg, availableServers, adptr, parsedScope)
+	}
+
+	// Handle --no-prompt
+	if addNoPrompt {
+		return presetNoPrompt(cfg, availableServers, adptr, parsedScope)
+	}
+
+	// Single server: use normal single-server flow
+	if len(availableServers) == 1 {
+		return runAddSingle(cfg, availableServers[0])
+	}
+
+	// Multiple servers: launch interactive TUI
+	return presetInteractive(cfg, availableServers, adptr, parsedScope)
+}
+
+// expandPreset expands a preset name into a list of server names
+func expandPreset(cfg *config.Config, presetName string) ([]string, error) {
+	presetServers, err := cfg.ExpandPreset(presetName)
+	if err != nil {
+		return nil, fmt.Errorf("preset '%s' not found in configuration", presetName)
+	}
+	return presetServers, nil
+}
+
+// filterAvailableServers filters out already-installed servers
+func filterAvailableServers(servers []string, adptr adapter.Adapter, scope adapter.Scope) []string {
+	var available []string
+	for _, s := range servers {
+		if !adptr.ServerExists(s, scope) {
+			available = append(available, s)
+		}
+	}
+	return available
+}
+
+// presetDryRun prints dry-run output for all servers in a preset
+func presetDryRun(cfg *config.Config, servers []string, adptr adapter.Adapter, scope adapter.Scope) error {
+	for _, srvName := range servers {
+		server := cfg.Servers[srvName]
+		// Parse --env flags
+		providedEnv, err := parseEnvFlags(addEnvVars)
 		if err != nil {
 			return err
 		}
-
-		// Get adapter
-		adptr, err := GetAdapter()
+		// Process templates
+		tmplData := template.NewTemplateData()
+		processedServer, err := template.ProcessServer(server, tmplData)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to process templates for %s: %w", srvName, err)
 		}
-
-		// Filter out already-installed servers
-		var availableServers []string
-		for _, s := range presetServers {
-			if !adptr.ServerExists(s, parsedScope) {
-				availableServers = append(availableServers, s)
-			}
+		// Collect env vars (non-interactive for dry-run)
+		collectedEnv, err := env.CollectEnvVars(processedServer, providedEnv, false)
+		if err != nil {
+			return fmt.Errorf("failed to collect env vars for %s: %w", srvName, err)
 		}
+		fmt.Printf("--- %s ---\n", srvName)
+		fmt.Println(adptr.DryRun(srvName, processedServer, scope, collectedEnv))
+	}
+	return nil
+}
 
-		if len(availableServers) == 0 {
-			fmt.Println("All servers in preset are already installed.")
-			return nil
-		}
-
-		// Handle --dry-run: print dry-run output for each server (no TUI)
-		if addDryRun {
-			for _, srvName := range availableServers {
-				server := cfg.Servers[srvName]
-				// Parse --env flags
-				providedEnv, err := parseEnvFlags(addEnvVars)
-				if err != nil {
-					return err
-				}
-				// Process templates
-				tmplData := template.NewTemplateData()
-				processedServer, err := template.ProcessServer(server, tmplData)
-				if err != nil {
-					return fmt.Errorf("failed to process templates for %s: %w", srvName, err)
-				}
-				// Collect env vars (non-interactive for dry-run)
-				collectedEnv, err := env.CollectEnvVars(processedServer, providedEnv, false)
-				if err != nil {
-					return fmt.Errorf("failed to collect env vars for %s: %w", srvName, err)
-				}
-				fmt.Printf("--- %s ---\n", srvName)
-				fmt.Println(adptr.DryRun(srvName, processedServer, parsedScope, collectedEnv))
-			}
-			return nil
-		}
-
-		// Handle --no-prompt: install all non-interactively
-		if addNoPrompt {
-			providedEnv, err := parseEnvFlags(addEnvVars)
-			if err != nil {
-				return err
-			}
-			installer := app.NewServerInstaller(cfg, adptr)
-			for _, srvName := range availableServers {
-				server := cfg.Servers[srvName]
-				tmplData := template.NewTemplateData()
-				processedServer, err := template.ProcessServer(server, tmplData)
-				if err != nil {
-					return fmt.Errorf("failed to process templates for %s: %w", srvName, err)
-				}
-				collectedEnv, err := env.CollectEnvVars(processedServer, providedEnv, false)
-				if err != nil {
-					return fmt.Errorf("server %s: %w", srvName, err)
-				}
-				req := app.ServerInstallRequest{
-					ServerName: srvName,
-					Scope:      parsedScope,
-					EnvValues:  collectedEnv,
-				}
-				resp := installer.Install(context.Background(), req)
-				if resp.Error != nil {
-					return fmt.Errorf("failed to install %s: %w", srvName, resp.Error)
-				}
-				fmt.Printf("Successfully added server '%s' to %s (scope: %s)\n", srvName, adptr.Name(), parsedScope)
-			}
-			return nil
-		}
-
-		// Single server in preset: use normal single-server flow
-		if len(availableServers) == 1 {
-			serverName = availableServers[0]
-			// Fall through to existing single-server logic below
-		} else {
-			// Multiple servers: launch BulkConfigureModel TUI
-			bulkModel := tui.NewBulkConfigureModel(availableServers, cfg, adptr, parsedScope)
-			p := tea.NewProgram(bulkModel, tea.WithAltScreen())
-			_, err = p.Run()
+// presetNoPrompt installs all servers in a preset non-interactively
+func presetNoPrompt(cfg *config.Config, servers []string, adptr adapter.Adapter, scope adapter.Scope) error {
+	providedEnv, err := parseEnvFlags(addEnvVars)
+	if err != nil {
+		return err
+	}
+	installer := app.NewServerInstaller(cfg, adptr)
+	for _, srvName := range servers {
+		if err := installServerNonInteractive(cfg, installer, srvName, scope, providedEnv, adptr); err != nil {
 			return err
 		}
 	}
+	return nil
+}
 
+// installServerNonInteractive installs a single server without prompting
+func installServerNonInteractive(cfg *config.Config, installer app.ServerInstaller, srvName string, scope adapter.Scope, providedEnv map[string]string, adptr adapter.Adapter) error {
+	server := cfg.Servers[srvName]
+	tmplData := template.NewTemplateData()
+	processedServer, err := template.ProcessServer(server, tmplData)
+	if err != nil {
+		return fmt.Errorf("failed to process templates for %s: %w", srvName, err)
+	}
+	collectedEnv, err := env.CollectEnvVars(processedServer, providedEnv, false)
+	if err != nil {
+		return fmt.Errorf("server %s: %w", srvName, err)
+	}
+	req := app.ServerInstallRequest{
+		ServerName: srvName,
+		Scope:      scope,
+		EnvValues:  collectedEnv,
+	}
+	resp := installer.Install(context.Background(), req)
+	if resp.Error != nil {
+		return fmt.Errorf("failed to install %s: %w", srvName, resp.Error)
+	}
+	fmt.Printf("Successfully added server '%s' to %s (scope: %s)\n", srvName, adptr.Name(), scope)
+	return nil
+}
+
+// presetInteractive launches the BulkConfigureModel TUI for multiple servers
+func presetInteractive(cfg *config.Config, servers []string, adptr adapter.Adapter, scope adapter.Scope) error {
+	bulkModel := tui.NewBulkConfigureModel(servers, cfg, adptr, scope)
+	p := tea.NewProgram(bulkModel, tea.WithAltScreen())
+	_, err := p.Run()
+	return err
+}
+
+// runAddSingle handles adding a single server
+func runAddSingle(cfg *config.Config, serverName string) error {
 	// Find server in config
 	server, exists := cfg.Servers[serverName]
 	if !exists {
@@ -207,8 +259,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Process templates BEFORE collecting env vars
-	// This ensures templated EnvVar.Default values are resolved
-	// before the priority system in CollectEnvVars uses them
 	tmplData := template.NewTemplateData()
 	processedServer, err := template.ProcessServer(server, tmplData)
 	if err != nil {
@@ -243,7 +293,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// Create installer service
 	installer := app.NewServerInstaller(cfg, adptr)
 
-	// Dry run or execute (server already processed, no template work needed in adapter)
+	// Dry run or execute
 	if addDryRun {
 		req := app.ServerInstallRequest{
 			ServerName: serverName,

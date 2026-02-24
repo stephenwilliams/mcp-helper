@@ -73,7 +73,11 @@ func runReplay() error {
 	if err != nil {
 		return fmt.Errorf("failed to start harness: %w", err)
 	}
-	defer h.Stop()
+	defer func() {
+		if err := h.Stop(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: harness stop failed: %v\n", err)
+		}
+	}()
 
 	oracles := tuiharness.DefaultOracles()
 	result, err := tuiharness.Replay(h, actions, oracles, 50*time.Millisecond)
@@ -124,11 +128,12 @@ func runExploration() error {
 
 	failureFound := false
 
+episodeLoop:
 	for episode := 0; episode < *seeds; episode++ {
 		select {
 		case <-overallTimeout:
 			fmt.Println("\nOverall timeout reached")
-			break
+			break episodeLoop
 		default:
 		}
 
@@ -154,35 +159,18 @@ func runExploration() error {
 		oracles := tuiharness.DefaultOracles()
 
 		result := explorer.Run(h, oracles)
-		h.Stop()
+		if err := h.Stop(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: harness stop failed: %v\n", err)
+		}
 
 		if result.Failure != nil {
-			fmt.Printf("FAILURE at step %d (%s)\n", result.FailureStep, result.Failure.OracleName)
-			failureFound = true
-
-			// Save artifacts
-			artifactWriter := tuiharness.NewArtifactWriter(*artifactDir)
-			artifactPath, err := artifactWriter.SaveFailure(result)
+			artifactPath, err := handleExplorationFailure(result, *artifactDir, *minimize)
 			if err != nil {
-				fmt.Printf("  Warning: failed to save artifacts: %v\n", err)
-			} else {
-				fmt.Printf("  Artifacts: %s\n", artifactPath)
+				fmt.Printf("  Warning: failed to handle failure: %v\n", err)
+			} else if artifactPath != "" {
 				report.AddResult(result, artifactPath)
-
-				// Attempt minimization
-				if *minimize && len(result.Steps) > 1 {
-					fmt.Printf("  Minimizing...")
-					minimizer := tuiharness.NewMinimizer(createModelFactory(), oracles, tuiharness.Options{
-						Cols: *cols,
-						Rows: *rows,
-					})
-					if err := minimizer.MinimizeAndSave(artifactPath, result.Steps[:result.FailureStep+1]); err != nil {
-						fmt.Printf(" failed: %v\n", err)
-					} else {
-						fmt.Printf(" done\n")
-					}
-				}
 			}
+			failureFound = true
 		} else {
 			fmt.Printf("OK (%d steps, %d states)\n", result.TotalSteps, result.UniqueStates)
 			report.AddResult(result, "")
@@ -201,12 +189,39 @@ func runExploration() error {
 	fmt.Printf("\nTotal time: %v\n", elapsed)
 
 	if failureFound {
-		fmt.Println("\nExiting with code 1 (failures found)")
-		os.Exit(1)
+		return fmt.Errorf("failures found during exploration")
 	}
 
-	fmt.Println("\nExiting with code 0 (no failures)")
 	return nil
+}
+
+func handleExplorationFailure(result *tuiharness.ExplorationResult, artifactDir string, minimize bool) (string, error) {
+	fmt.Printf("FAILURE at step %d (%s)\n", result.FailureStep, result.Failure.OracleName)
+
+	// Save artifacts
+	artifactWriter := tuiharness.NewArtifactWriter(artifactDir)
+	artifactPath, err := artifactWriter.SaveFailure(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to save artifacts: %w", err)
+	}
+
+	fmt.Printf("  Artifacts: %s\n", artifactPath)
+
+	// Attempt minimization
+	if minimize && len(result.Steps) > 1 {
+		fmt.Printf("  Minimizing...")
+		minimizer := tuiharness.NewMinimizer(createModelFactory(), tuiharness.DefaultOracles(), tuiharness.Options{
+			Cols: *cols,
+			Rows: *rows,
+		})
+		if err := minimizer.MinimizeAndSave(artifactPath, result.Steps[:result.FailureStep+1]); err != nil {
+			fmt.Printf(" failed: %v\n", err)
+		} else {
+			fmt.Printf(" done\n")
+		}
+	}
+
+	return artifactPath, nil
 }
 
 func createModelFactory() tuiharness.ModelFactory {

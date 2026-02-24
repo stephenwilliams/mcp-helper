@@ -241,7 +241,7 @@ func (a *Adapter) SavePermissions(path string, rules []permissions.PermissionRul
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 	if err := os.Rename(tempPath, path); err != nil {
-		os.Remove(tempPath) // Clean up temp file
+		_ = os.Remove(tempPath) // Clean up temp file
 		return fmt.Errorf("failed to rename temp file: %w", err)
 	}
 

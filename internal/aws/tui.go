@@ -120,7 +120,7 @@ func (m MultiSelectModel) View() string {
 			cursor = cursorStyle.Render("► ")
 		}
 
-		checkbox := "[ ]"
+		var checkbox string
 		if m.selected[i] {
 			checkbox = checkedStyle.Render("[x]")
 		} else {

@@ -101,6 +101,35 @@ func (c *ClaudeCode) AddServer(name string, server *config.Server, scope adapter
 	return nil
 }
 
+// maskHeaderValue returns masked value for sensitive headers, otherwise returns original value
+func maskHeaderValue(key, value string) string {
+	if env.IsSecret(key) {
+		return "***MASKED***"
+	}
+	return value
+}
+
+// quoteArg quotes an argument if it contains spaces
+func quoteArg(arg string) string {
+	if strings.Contains(arg, " ") {
+		return fmt.Sprintf(`"%s"`, arg)
+	}
+	return arg
+}
+
+// formatHeaderArg formats a header argument with masking for sensitive values
+func formatHeaderArg(headerArg string) string {
+	colonIdx := strings.Index(headerArg, ": ")
+	if colonIdx <= 0 {
+		return quoteArg(headerArg)
+	}
+	headerName := headerArg[:colonIdx]
+	headerValue := headerArg[colonIdx+2:]
+	maskedValue := maskHeaderValue(headerName, headerValue)
+	maskedArg := fmt.Sprintf("%s: %s", headerName, maskedValue)
+	return quoteArg(maskedArg)
+}
+
 // DryRun returns the command string that would be executed to add the server,
 // without actually executing it. This is useful for previewing changes or
 // generating documentation. Secret header values are masked for security.
@@ -125,38 +154,11 @@ func (c *ClaudeCode) DryRun(name string, server *config.Server, scope adapter.Sc
 		if arg == "-H" && i+1 < len(args) {
 			parts = append(parts, arg)
 			i++
-			headerArg := args[i]
-			// Parse "HeaderName: Value" format and mask if secret
-			if colonIdx := strings.Index(headerArg, ": "); colonIdx > 0 {
-				headerName := headerArg[:colonIdx]
-				headerValue := headerArg[colonIdx+2:]
-				maskedValue := headerValue
-				if env.IsSecret(headerName) {
-					maskedValue = "***MASKED***"
-				}
-				maskedArg := fmt.Sprintf("%s: %s", headerName, maskedValue)
-				if strings.Contains(maskedArg, " ") {
-					parts = append(parts, fmt.Sprintf(`"%s"`, maskedArg))
-				} else {
-					parts = append(parts, maskedArg)
-				}
-			} else {
-				// Fallback: quote if has space
-				if strings.Contains(headerArg, " ") {
-					parts = append(parts, fmt.Sprintf(`"%s"`, headerArg))
-				} else {
-					parts = append(parts, headerArg)
-				}
-			}
+			parts = append(parts, formatHeaderArg(args[i]))
 			continue
 		}
 
-		// Quote arguments that contain spaces
-		if strings.Contains(arg, " ") {
-			parts = append(parts, fmt.Sprintf(`"%s"`, arg))
-		} else {
-			parts = append(parts, arg)
-		}
+		parts = append(parts, quoteArg(arg))
 	}
 
 	return strings.Join(parts, " ")

@@ -71,7 +71,7 @@ func init() {
 	awsDiscoverCmd.Flags().BoolVar(&awsDiscoverForce, "force", false, "Overwrite existing servers (default: skip with warning)")
 
 	// Register completions
-	awsDiscoverCmd.RegisterFlagCompletionFunc("scope", ScopeCompletion)
+	_ = awsDiscoverCmd.RegisterFlagCompletionFunc("scope", ScopeCompletion)
 }
 
 func runAwsDiscover(cmd *cobra.Command, args []string) error {

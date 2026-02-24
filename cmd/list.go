@@ -80,7 +80,7 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	// Table output
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tTRANSPORT\tDESCRIPTION")
+	_, _ = fmt.Fprintln(w, "NAME\tTRANSPORT\tDESCRIPTION")
 
 	// Sort server names for consistent output
 	names := make([]string, 0, len(cfg.Servers))
@@ -91,10 +91,10 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	for _, name := range names {
 		server := cfg.Servers[name]
-		fmt.Fprintf(w, "%s\t%s\t%s\n", name, server.Transport, server.Description)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", name, server.Transport, server.Description)
 	}
 
-	w.Flush()
+	_ = w.Flush()
 
 	// Footer with count and path
 	count := len(cfg.Servers)

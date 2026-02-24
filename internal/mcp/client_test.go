@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -509,15 +508,4 @@ func BenchmarkDiscoverTools(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		client.DiscoverTools(ctx, servers, false)
 	}
-}
-
-// Helper function for tests that need to parse JSON-RPC
-func parseJSONRPCRequest(t *testing.T, r io.Reader) *JSONRPCRequest {
-	t.Helper()
-	var req JSONRPCRequest
-	decoder := json.NewDecoder(r)
-	if err := decoder.Decode(&req); err != nil {
-		t.Fatalf("Failed to parse JSON-RPC request: %v", err)
-	}
-	return &req
 }
