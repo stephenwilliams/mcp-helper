@@ -79,7 +79,9 @@ func (m MultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case " ":
-			m.selected[m.cursor] = !m.selected[m.cursor]
+			if m.cursor < len(m.profiles) {
+				m.selected[m.cursor] = !m.selected[m.cursor]
+			}
 
 		case "a":
 			for i := range m.profiles {
@@ -163,7 +165,7 @@ func (m MultiSelectModel) View() string {
 	for i := range m.selected {
 		if m.selected[i] {
 			selectedCount++
-			if m.profiles[i].IsSSO {
+			if i < len(m.profiles) && m.profiles[i].IsSSO {
 				ssoCount++
 			}
 		}

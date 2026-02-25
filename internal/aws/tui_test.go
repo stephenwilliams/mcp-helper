@@ -285,6 +285,323 @@ func TestSelectedProfiles(t *testing.T) {
 	}
 }
 
+func TestMultiSelectModel_EmptyProfiles(t *testing.T) {
+	m := NewMultiSelectModel([]MCPProfile{})
+
+	if m.cursor != 0 {
+		t.Errorf("expected cursor 0 for empty profile list, got %d", m.cursor)
+	}
+
+	if len(m.selected) != 0 {
+		t.Errorf("expected empty selected map, got %d entries", len(m.selected))
+	}
+
+	// Navigation on empty list should not panic
+	msg := tea.KeyMsg{Type: tea.KeyDown}
+	newModel, _ := m.Update(msg)
+	m = newModel.(MultiSelectModel)
+	if m.cursor != 0 {
+		t.Errorf("cursor should stay 0 on down with empty list, got %d", m.cursor)
+	}
+
+	msg = tea.KeyMsg{Type: tea.KeyUp}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+	if m.cursor != 0 {
+		t.Errorf("cursor should stay 0 on up with empty list, got %d", m.cursor)
+	}
+
+	// Space on empty list should not panic
+	msg = tea.KeyMsg{Type: tea.KeySpace}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	// Select all on empty list should not panic
+	msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	// SelectedProfiles on empty list should return empty slice
+	selected := m.SelectedProfiles()
+	if selected != nil && len(selected) != 0 {
+		t.Errorf("expected empty selected profiles, got %d", len(selected))
+	}
+
+	// View on empty list should not panic
+	view := m.View()
+	if !strings.Contains(view, "AWS MCP Profile Discovery") {
+		t.Error("view should contain title even with empty profile list")
+	}
+	if !strings.Contains(view, "0 of 0 selected") {
+		t.Errorf("view should show '0 of 0 selected', got: %s", view)
+	}
+}
+
+func TestMultiSelectModel_SingleProfile(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "only-mcpro", BaseName: "only", Mode: "ro", Region: "us-east-1", IsSSO: false},
+	}
+	m := NewMultiSelectModel(profiles)
+
+	// Down from only item should stay at 0
+	msg := tea.KeyMsg{Type: tea.KeyDown}
+	newModel, _ := m.Update(msg)
+	m = newModel.(MultiSelectModel)
+	if m.cursor != 0 {
+		t.Errorf("cursor should stay 0 on down at single item, got %d", m.cursor)
+	}
+
+	// Up from only item should stay at 0
+	msg = tea.KeyMsg{Type: tea.KeyUp}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+	if m.cursor != 0 {
+		t.Errorf("cursor should stay 0 on up at single item, got %d", m.cursor)
+	}
+
+	// Toggle, then confirm - SelectedProfiles should return the one profile
+	msg = tea.KeyMsg{Type: tea.KeySpace}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	selected := m.SelectedProfiles()
+	if len(selected) != 1 {
+		t.Fatalf("expected 1 selected profile, got %d", len(selected))
+	}
+	if selected[0].Name != "only-mcpro" {
+		t.Errorf("expected 'only-mcpro', got '%s'", selected[0].Name)
+	}
+}
+
+func TestMultiSelectModel_WindowSizeMsg(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "dev-mcpro", BaseName: "dev", Mode: "ro", Region: "us-east-1"},
+	}
+	m := NewMultiSelectModel(profiles)
+
+	msg := tea.WindowSizeMsg{Width: 200, Height: 50}
+	newModel, _ := m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	if m.width != 200 {
+		t.Errorf("expected width 200, got %d", m.width)
+	}
+	if m.height != 50 {
+		t.Errorf("expected height 50, got %d", m.height)
+	}
+}
+
+func TestMultiSelectModel_Init(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "dev-mcpro", BaseName: "dev", Mode: "ro"},
+	}
+	m := NewMultiSelectModel(profiles)
+
+	// Init should return nil command
+	cmd := m.Init()
+	if cmd != nil {
+		t.Error("Init should return nil command")
+	}
+}
+
+func TestMultiSelectModel_ConfirmWithNoneSelected(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "dev-mcpro", BaseName: "dev", Mode: "ro"},
+		{Name: "prod-mcpro", BaseName: "prod", Mode: "ro"},
+	}
+	m := NewMultiSelectModel(profiles)
+
+	// Confirm without selecting anything
+	msg := tea.KeyMsg{Type: tea.KeyEnter}
+	newModel, _ := m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	if !m.WasConfirmed() {
+		t.Error("enter should confirm even with no profiles selected")
+	}
+
+	selected := m.SelectedProfiles()
+	if len(selected) != 0 {
+		t.Errorf("expected 0 selected profiles, got %d", len(selected))
+	}
+}
+
+func TestView_ReadWriteMode(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "dev-mcprw", BaseName: "dev", Mode: "rw", Region: "us-east-1", IsSSO: false},
+		{Name: "prod-mcpro", BaseName: "prod", Mode: "ro", Region: "eu-west-1", IsSSO: false},
+	}
+	m := NewMultiSelectModel(profiles)
+	view := m.View()
+
+	if !strings.Contains(view, "read-write") {
+		t.Error("view should display 'read-write' for rw mode profile")
+	}
+	if !strings.Contains(view, "read-only") {
+		t.Error("view should display 'read-only' for ro mode profile")
+	}
+}
+
+func TestView_SSOCountText(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "dev-mcpro", BaseName: "dev", Mode: "ro", Region: "us-east-1", IsSSO: true},
+		{Name: "prod-mcpro", BaseName: "prod", Mode: "ro", Region: "eu-west-1", IsSSO: false},
+	}
+	m := NewMultiSelectModel(profiles)
+
+	// Select both profiles
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+	newModel, _ := m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	view := m.View()
+
+	// Should mention SSO login warning since an SSO profile is selected
+	if !strings.Contains(view, "aws sso login") {
+		t.Error("view should contain SSO login hint when SSO profiles are selected")
+	}
+
+	// Deselect all - SSO warning should disappear
+	msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	view = m.View()
+	if strings.Contains(view, "aws sso login") {
+		t.Error("view should not show SSO login hint when no profiles are selected")
+	}
+}
+
+func TestView_SelectedCountText(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "p1-mcpro", BaseName: "p1", Mode: "ro"},
+		{Name: "p2-mcpro", BaseName: "p2", Mode: "ro"},
+		{Name: "p3-mcpro", BaseName: "p3", Mode: "ro"},
+	}
+	m := NewMultiSelectModel(profiles)
+
+	view := m.View()
+	if !strings.Contains(view, "0 of 3 selected") {
+		t.Errorf("view should show '0 of 3 selected' initially, got: %s", view)
+	}
+
+	// Select first profile
+	msg := tea.KeyMsg{Type: tea.KeySpace}
+	newModel, _ := m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	view = m.View()
+	if !strings.Contains(view, "1 of 3 selected") {
+		t.Errorf("view should show '1 of 3 selected' after one toggle, got: %s", view)
+	}
+
+	// Select all
+	msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	view = m.View()
+	if !strings.Contains(view, "3 of 3 selected") {
+		t.Errorf("view should show '3 of 3 selected' after select all, got: %s", view)
+	}
+}
+
+func TestMultiSelectModel_DeselectAllReplacesMap(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "p1-mcpro", BaseName: "p1", Mode: "ro"},
+		{Name: "p2-mcpro", BaseName: "p2", Mode: "ro"},
+	}
+	m := NewMultiSelectModel(profiles)
+
+	// Select all then deselect all
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+	newModel, _ := m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	// Toggle should still work after deselect-all replaced the map
+	msg = tea.KeyMsg{Type: tea.KeySpace}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	if !m.selected[0] {
+		t.Error("toggle after deselect-all should re-select current item")
+	}
+}
+
+func TestMultiSelectModel_CursorRetainedOnToggle(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "p1-mcpro", BaseName: "p1", Mode: "ro"},
+		{Name: "p2-mcpro", BaseName: "p2", Mode: "ro"},
+		{Name: "p3-mcpro", BaseName: "p3", Mode: "ro"},
+	}
+	m := NewMultiSelectModel(profiles)
+
+	// Move cursor to index 1
+	msg := tea.KeyMsg{Type: tea.KeyDown}
+	newModel, _ := m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	// Toggle selection at index 1
+	msg = tea.KeyMsg{Type: tea.KeySpace}
+	newModel, _ = m.Update(msg)
+	m = newModel.(MultiSelectModel)
+
+	if m.cursor != 1 {
+		t.Errorf("cursor should remain at 1 after toggle, got %d", m.cursor)
+	}
+	if !m.selected[1] {
+		t.Error("item at index 1 should be selected")
+	}
+	if m.selected[0] || m.selected[2] {
+		t.Error("items at index 0 and 2 should not be selected")
+	}
+}
+
+func TestView_HelpText(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "dev-mcpro", BaseName: "dev", Mode: "ro"},
+	}
+	m := NewMultiSelectModel(profiles)
+	view := m.View()
+
+	expectedHints := []string{"select all", "deselect all", "space", "toggle", "enter", "confirm", "cancel"}
+	for _, hint := range expectedHints {
+		if !strings.Contains(view, hint) {
+			t.Errorf("view help text should contain '%s'", hint)
+		}
+	}
+}
+
+func TestView_CursorIndicator(t *testing.T) {
+	profiles := []MCPProfile{
+		{Name: "p1-mcpro", BaseName: "p1", Mode: "ro"},
+		{Name: "p2-mcpro", BaseName: "p2", Mode: "ro"},
+	}
+	m := NewMultiSelectModel(profiles)
+	view := m.View()
+
+	// Cursor indicator should appear exactly once (on first item initially)
+	cursorCount := strings.Count(view, "►")
+	if cursorCount != 1 {
+		t.Errorf("expected exactly 1 cursor indicator, got %d", cursorCount)
+	}
+
+	// Move cursor down
+	msg := tea.KeyMsg{Type: tea.KeyDown}
+	newModel, _ := m.Update(msg)
+	m = newModel.(MultiSelectModel)
+	view = m.View()
+
+	cursorCount = strings.Count(view, "►")
+	if cursorCount != 1 {
+		t.Errorf("expected exactly 1 cursor indicator after move, got %d", cursorCount)
+	}
+}
+
 func TestView_SSOBadge(t *testing.T) {
 	profiles := []MCPProfile{
 		{Name: "dev-mcpro", BaseName: "dev", Mode: "ro", Region: "us-east-1", IsSSO: true},
