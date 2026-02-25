@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/stephenwilliams/mcp-helper/internal/config"
@@ -153,4 +154,42 @@ func Prompt(name, description string) (string, error) {
 	}
 
 	return strings.TrimSpace(value), nil
+}
+
+// ClaudeConfigDir returns the Claude configuration directory path.
+// It checks CLAUDE_CONFIG_DIR environment variable first, falling back
+// to ~/.claude if not set. Tilde expansion is performed on the value.
+//
+// Returns the resolved path and any error from home directory lookup.
+func ClaudeConfigDir() (string, error) {
+	if configDir := os.Getenv("CLAUDE_CONFIG_DIR"); configDir != "" {
+		return expandTilde(configDir)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(homeDir, ".claude"), nil
+}
+
+// expandTilde expands a leading ~ to the user's home directory.
+func expandTilde(path string) (string, error) {
+	if !strings.HasPrefix(path, "~") {
+		return path, nil
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	if path == "~" {
+		return homeDir, nil
+	}
+	if strings.HasPrefix(path, "~/") {
+		return filepath.Join(homeDir, path[2:]), nil
+	}
+	// ~username syntax not supported, return as-is
+	return path, nil
 }

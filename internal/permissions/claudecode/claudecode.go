@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/stephenwilliams/mcp-helper/internal/env"
 	"github.com/stephenwilliams/mcp-helper/internal/mcp"
 	"github.com/stephenwilliams/mcp-helper/internal/permissions"
 )
@@ -126,11 +127,14 @@ func (a *Adapter) mcpConfigToServerConfig(name, scope string, cfg MCPServerConfi
 
 // GetSettingsPaths returns Claude Code settings file paths
 func (a *Adapter) GetSettingsPaths() []permissions.SettingsPath {
-	homeDir, _ := os.UserHomeDir()
+	// Use ClaudeConfigDir to respect CLAUDE_CONFIG_DIR env var for user scope.
+	// Note: ~/.claude.json (server discovery file at line 55) intentionally stays
+	// at home root as it is separate from the config directory.
+	configDir, _ := env.ClaudeConfigDir()
 
 	paths := []permissions.SettingsPath{
 		{
-			Path:  filepath.Join(homeDir, ".claude", "settings.json"),
+			Path:  filepath.Join(configDir, "settings.json"),
 			Scope: "user",
 		},
 		{

@@ -242,11 +242,11 @@ func (c *ClaudeCode) buildArgs(name string, server *config.Server, scope adapter
 func (c *ClaudeCode) GetConfigPath(scope adapter.Scope) string {
 	switch scope {
 	case adapter.ScopeUser:
-		homeDir, err := os.UserHomeDir()
+		configDir, err := env.ClaudeConfigDir()
 		if err != nil {
 			return ""
 		}
-		return filepath.Join(homeDir, ".claude", "config.json")
+		return filepath.Join(configDir, "config.json")
 	case adapter.ScopeProject, adapter.ScopeLocal:
 		return ".claude/config.json"
 	default:

@@ -568,3 +568,126 @@ func TestValidateMissing_MultipleRequired(t *testing.T) {
 		t.Errorf("ValidateMissing() should include REQ3")
 	}
 }
+
+func TestClaudeConfigDir(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+
+	tests := []struct {
+		name     string
+		envValue string
+		setEnv   bool // false means unset
+		want     string
+		wantErr  bool
+	}{
+		{
+			name:    "unset returns default ~/.claude",
+			setEnv:  false,
+			want:    homeDir + "/.claude",
+			wantErr: false,
+		},
+		{
+			name:     "absolute path returned as-is",
+			envValue: "/custom/claude/config",
+			setEnv:   true,
+			want:     "/custom/claude/config",
+			wantErr:  false,
+		},
+		{
+			name:     "tilde path expanded",
+			envValue: "~/.config/claude",
+			setEnv:   true,
+			want:     homeDir + "/.config/claude",
+			wantErr:  false,
+		},
+		{
+			name:     "tilde only expanded to home",
+			envValue: "~",
+			setEnv:   true,
+			want:     homeDir,
+			wantErr:  false,
+		},
+		{
+			name:     "relative path returned as-is",
+			envValue: "relative/path",
+			setEnv:   true,
+			want:     "relative/path",
+			wantErr:  false,
+		},
+		{
+			name:     "empty string treated as unset",
+			envValue: "",
+			setEnv:   true,
+			want:     homeDir + "/.claude",
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setEnv {
+				t.Setenv("CLAUDE_CONFIG_DIR", tt.envValue)
+			} else {
+				os.Unsetenv("CLAUDE_CONFIG_DIR")
+			}
+
+			got, err := ClaudeConfigDir()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ClaudeConfigDir() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ClaudeConfigDir() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExpandTilde(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+
+	tests := []struct {
+		name    string
+		path    string
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "no tilde unchanged",
+			path: "/absolute/path",
+			want: "/absolute/path",
+		},
+		{
+			name: "tilde alone",
+			path: "~",
+			want: homeDir,
+		},
+		{
+			name: "tilde with path",
+			path: "~/some/path",
+			want: homeDir + "/some/path",
+		},
+		{
+			name: "tilde username not expanded",
+			path: "~otheruser/path",
+			want: "~otheruser/path",
+		},
+		{
+			name: "relative path unchanged",
+			path: "relative/path",
+			want: "relative/path",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := expandTilde(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("expandTilde() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("expandTilde() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

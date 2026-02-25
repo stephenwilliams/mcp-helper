@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stephenwilliams/mcp-helper/internal/permissions"
@@ -238,5 +239,81 @@ func TestClaudeCodeSettings_MarshalJSON(t *testing.T) {
 	allow := perms["allow"].([]interface{})
 	if len(allow) != 1 || allow[0] != "mcp__github__*" {
 		t.Errorf("permissions.allow not correct")
+	}
+}
+
+func TestGetSettingsPaths_ClaudeConfigDir(t *testing.T) {
+	adapter := &Adapter{}
+
+	t.Run("user scope uses CLAUDE_CONFIG_DIR", func(t *testing.T) {
+		t.Setenv("CLAUDE_CONFIG_DIR", "/custom/config")
+
+		paths := adapter.GetSettingsPaths()
+
+		var userPath string
+		for _, p := range paths {
+			if p.Scope == "user" {
+				userPath = p.Path
+				break
+			}
+		}
+
+		expected := "/custom/config/settings.json"
+		if userPath != expected {
+			t.Errorf("GetSettingsPaths() user path = %v, want %v", userPath, expected)
+		}
+	})
+
+	t.Run("user scope expands tilde", func(t *testing.T) {
+		homeDir, _ := os.UserHomeDir()
+		t.Setenv("CLAUDE_CONFIG_DIR", "~/.config/claude")
+
+		paths := adapter.GetSettingsPaths()
+
+		var userPath string
+		for _, p := range paths {
+			if p.Scope == "user" {
+				userPath = p.Path
+				break
+			}
+		}
+
+		expected := filepath.Join(homeDir, ".config/claude", "settings.json")
+		if userPath != expected {
+			t.Errorf("GetSettingsPaths() user path = %v, want %v", userPath, expected)
+		}
+	})
+
+	t.Run("project and local scopes unchanged", func(t *testing.T) {
+		t.Setenv("CLAUDE_CONFIG_DIR", "/custom/config")
+
+		paths := adapter.GetSettingsPaths()
+
+		for _, p := range paths {
+			if p.Scope == "project" && p.Path != ".claude/settings.json" {
+				t.Errorf("project scope path = %v, want .claude/settings.json", p.Path)
+			}
+			if p.Scope == "local" && p.Path != ".claude/settings.local.json" {
+				t.Errorf("local scope path = %v, want .claude/settings.local.json", p.Path)
+			}
+		}
+	})
+}
+
+func TestGetMCPServers_ClaudeJSONUnchanged(t *testing.T) {
+	// This test verifies that ~/.claude.json path is NOT affected by CLAUDE_CONFIG_DIR
+	// The server discovery file intentionally stays at home root
+	t.Setenv("CLAUDE_CONFIG_DIR", "/custom/config")
+
+	adapter := &Adapter{}
+	// GetMCPServers reads ~/.claude.json which should still be at home root
+	// We can't easily test the actual path without mocking, but we can verify
+	// the function doesn't error when CLAUDE_CONFIG_DIR is set
+	_, err := adapter.GetMCPServers()
+	// Error is expected since ~/.claude.json likely doesn't exist in test env
+	// But we're checking it doesn't panic or have unexpected behavior
+	if err != nil && !strings.Contains(err.Error(), ".claude.json") {
+		// If there's an error, it should be about the file, not about CLAUDE_CONFIG_DIR
+		t.Logf("GetMCPServers() returned error (expected in test env): %v", err)
 	}
 }

@@ -1,6 +1,8 @@
 package claudecode
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -517,4 +519,38 @@ func TestBuildArgs_NameBeforeEnvVars(t *testing.T) {
 	if nameIdx >= firstEnvIdx {
 		t.Errorf("name must come before -e flags: name at index %d, first -e at index %d", nameIdx, firstEnvIdx)
 	}
+}
+
+func TestGetConfigPath_ClaudeConfigDir(t *testing.T) {
+	cc := New()
+
+	t.Run("user scope uses CLAUDE_CONFIG_DIR", func(t *testing.T) {
+		t.Setenv("CLAUDE_CONFIG_DIR", "/custom/config")
+
+		path := cc.GetConfigPath(adapter.ScopeUser)
+		expected := "/custom/config/config.json"
+		if path != expected {
+			t.Errorf("GetConfigPath(ScopeUser) = %v, want %v", path, expected)
+		}
+	})
+
+	t.Run("user scope expands tilde", func(t *testing.T) {
+		homeDir, _ := os.UserHomeDir()
+		t.Setenv("CLAUDE_CONFIG_DIR", "~/.config/claude")
+
+		path := cc.GetConfigPath(adapter.ScopeUser)
+		expected := filepath.Join(homeDir, ".config/claude", "config.json")
+		if path != expected {
+			t.Errorf("GetConfigPath(ScopeUser) = %v, want %v", path, expected)
+		}
+	})
+
+	t.Run("project scope ignores CLAUDE_CONFIG_DIR", func(t *testing.T) {
+		t.Setenv("CLAUDE_CONFIG_DIR", "/custom/config")
+
+		path := cc.GetConfigPath(adapter.ScopeProject)
+		if path != ".claude/config.json" {
+			t.Errorf("GetConfigPath(ScopeProject) = %v, want .claude/config.json", path)
+		}
+	})
 }
