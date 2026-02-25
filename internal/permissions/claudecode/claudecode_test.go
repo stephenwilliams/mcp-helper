@@ -300,20 +300,58 @@ func TestGetSettingsPaths_ClaudeConfigDir(t *testing.T) {
 	})
 }
 
-func TestGetMCPServers_ClaudeJSONUnchanged(t *testing.T) {
-	// This test verifies that ~/.claude.json path is NOT affected by CLAUDE_CONFIG_DIR
-	// The server discovery file intentionally stays at home root
-	t.Setenv("CLAUDE_CONFIG_DIR", "/custom/config")
-
+func TestGetMCPServers_ClaudeConfigDir(t *testing.T) {
+	// This test verifies that .claude.json path respects CLAUDE_CONFIG_DIR
 	adapter := &Adapter{}
-	// GetMCPServers reads ~/.claude.json which should still be at home root
-	// We can't easily test the actual path without mocking, but we can verify
-	// the function doesn't error when CLAUDE_CONFIG_DIR is set
-	_, err := adapter.GetMCPServers()
-	// Error is expected since ~/.claude.json likely doesn't exist in test env
-	// But we're checking it doesn't panic or have unexpected behavior
-	if err != nil && !strings.Contains(err.Error(), ".claude.json") {
-		// If there's an error, it should be about the file, not about CLAUDE_CONFIG_DIR
-		t.Logf("GetMCPServers() returned error (expected in test env): %v", err)
-	}
+
+	t.Run("uses CLAUDE_CONFIG_DIR for .claude.json", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("CLAUDE_CONFIG_DIR", tmpDir)
+
+		// Create a .claude.json in the custom config dir
+		claudeJSON := `{
+			"mcpServers": {
+				"test-server": {
+					"command": "test-cmd",
+					"args": ["arg1"]
+				}
+			}
+		}`
+		if err := os.WriteFile(filepath.Join(tmpDir, ".claude.json"), []byte(claudeJSON), 0644); err != nil {
+			t.Fatalf("Failed to create test .claude.json: %v", err)
+		}
+
+		servers, err := adapter.GetMCPServers()
+		if err != nil {
+			t.Fatalf("GetMCPServers() failed: %v", err)
+		}
+
+		// Should find the test-server from custom config dir
+		found := false
+		for _, srv := range servers {
+			if srv.Name == "test-server" {
+				found = true
+				if srv.Scope != "user" {
+					t.Errorf("Expected scope 'user', got %q", srv.Scope)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected to find test-server from custom CLAUDE_CONFIG_DIR")
+		}
+	})
+
+	t.Run("expands tilde in CLAUDE_CONFIG_DIR", func(t *testing.T) {
+		homeDir, _ := os.UserHomeDir()
+		t.Setenv("CLAUDE_CONFIG_DIR", "~/.config/claude-test")
+
+		// GetMCPServers should not error even if file doesn't exist
+		_, err := adapter.GetMCPServers()
+		// We just verify it doesn't panic and handles tilde expansion
+		if err != nil && !strings.Contains(err.Error(), filepath.Join(homeDir, ".config/claude-test")) {
+			// Error path should show expanded tilde
+			t.Logf("GetMCPServers() error (expected): %v", err)
+		}
+	})
 }

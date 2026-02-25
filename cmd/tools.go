@@ -9,7 +9,8 @@ var toolsCmd = &cobra.Command{
 	Short: "Discover and manage MCP server tools",
 	Long: `Commands for discovering tools from configured MCP servers and managing tool permissions.
 
-MCP servers must be configured in the agent's configuration file (e.g., ~/.claude.json for Claude Code).
+MCP servers must be configured in the agent's configuration file.
+For Claude Code: $CLAUDE_CONFIG_DIR/.claude.json (defaults to ~/.claude/.claude.json).
 Tools are discovered by connecting to servers and querying their tool lists.`,
 }
 

@@ -30,16 +30,11 @@ func (a *Adapter) Name() string {
 }
 
 // GetMCPServers reads MCP server configurations from all scopes:
-// - User scope: ~/.claude.json mcpServers
-// - Local scope: ~/.claude.json projects[cwd].mcpServers
+// - User scope: $CLAUDE_CONFIG_DIR/.claude.json mcpServers (defaults to ~/.claude/.claude.json)
+// - Local scope: $CLAUDE_CONFIG_DIR/.claude.json projects[cwd].mcpServers
 // - Project scope: .mcp.json in current directory
 func (a *Adapter) GetMCPServers() ([]mcp.ServerConfig, error) {
 	var servers []mcp.ServerConfig
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user home directory: %w", err)
-	}
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -52,8 +47,12 @@ func (a *Adapter) GetMCPServers() ([]mcp.ServerConfig, error) {
 		resolvedCwd = cwd // Fall back to original if symlink resolution fails
 	}
 
-	// Read ~/.claude.json for user and local scope servers
-	claudeConfigPath := filepath.Join(homeDir, ".claude.json")
+	// Read .claude.json for user and local scope servers (respects CLAUDE_CONFIG_DIR)
+	configDir, err := env.ClaudeConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get config directory: %w", err)
+	}
+	claudeConfigPath := filepath.Join(configDir, ".claude.json")
 	data, err := os.ReadFile(claudeConfigPath)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("failed to read %s: %w", claudeConfigPath, err)
@@ -128,8 +127,6 @@ func (a *Adapter) mcpConfigToServerConfig(name, scope string, cfg MCPServerConfi
 // GetSettingsPaths returns Claude Code settings file paths
 func (a *Adapter) GetSettingsPaths() []permissions.SettingsPath {
 	// Use ClaudeConfigDir to respect CLAUDE_CONFIG_DIR env var for user scope.
-	// Note: ~/.claude.json (server discovery file at line 55) intentionally stays
-	// at home root as it is separate from the config directory.
 	configDir, _ := env.ClaudeConfigDir()
 
 	paths := []permissions.SettingsPath{

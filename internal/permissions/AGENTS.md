@@ -95,7 +95,7 @@ servers, err := adapter.GetMCPServers()
 
 ### File Locations
 
-- **MCP Servers**: `~/.claude.json` → `mcpServers` key
+- **MCP Servers**: `$CLAUDE_CONFIG_DIR/.claude.json` → `mcpServers` key (defaults to `~/.claude/.claude.json`)
 - **User Permissions**: `~/.claude/settings.json` → `permissions.allow`
 - **Project Permissions**: `.claude/settings.json` → `permissions.allow`
 - **Local Permissions**: `.claude/settings.local.json` → `permissions.allow`

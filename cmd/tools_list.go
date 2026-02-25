@@ -25,7 +25,8 @@ var toolsListCmd = &cobra.Command{
 	Short: "List tools from configured MCP servers",
 	Long: `Discover and list tools from all configured MCP servers.
 
-Tools are read from the agent's MCP configuration (e.g., ~/.claude.json for Claude Code).
+Tools are read from the agent's MCP configuration.
+For Claude Code: $CLAUDE_CONFIG_DIR/.claude.json (defaults to ~/.claude/.claude.json).
 Environment variables are sourced from that same config.
 
 By default, results are cached for 1 hour. Use --no-cache to bypass the cache.
@@ -73,7 +74,7 @@ func runToolsList(cmd *cobra.Command, args []string) error {
 		fmt.Println("No MCP servers configured.")
 		if !toolsListJSON {
 			fmt.Printf("\nConfigure MCP servers in your agent's configuration file.\n")
-			fmt.Printf("For Claude Code: ~/.claude.json\n")
+			fmt.Printf("For Claude Code: $CLAUDE_CONFIG_DIR/.claude.json (defaults to ~/.claude/.claude.json)\n")
 		}
 		return nil
 	}
