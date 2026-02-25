@@ -195,6 +195,15 @@ func (m BulkConfigureModel) updateConfiguring(msg tea.KeyMsg) (tea.Model, tea.Cm
 			m.cursorPos = len(m.textInput)
 		}
 
+	case "up", "down", "pgup", "pgdown", "ctrl+r":
+		// No-op when no env vars to configure (form is empty)
+		// These keys are intentionally ignored in this state to prevent
+		// them from being consumed by the default character input handler
+		if len(m.envKeys) == 0 {
+			return m, nil
+		}
+		// When there are fields, these keys don't apply to text input anyway
+
 	case "backspace":
 		if m.cursorPos > 0 {
 			m.textInput = m.textInput[:m.cursorPos-1] + m.textInput[m.cursorPos:]

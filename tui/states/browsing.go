@@ -239,6 +239,10 @@ func (h *BrowsingHandler) Update(p BrowsingUpdateParams, updateFilter, updatePre
 			}
 		}
 
+	case "left", "right":
+		// No horizontal navigation in list view - ignore these keys
+		// Prevents accidental filter activation from arrow key presses
+
 	case " ":
 		// Toggle selection in multi-select mode
 		if p.MultiSelectMode {

@@ -153,6 +153,11 @@ func NewFocusMarkerOracle() *FocusMarkerOracle {
 
 // Check checks if focus markers are present when expected.
 func (f *FocusMarkerOracle) Check(screen *Screen, _ []*Screen) *OracleResult {
+	// Skip check on screens that are prompts/forms (no list to navigate)
+	if isPromptScreen(screen) {
+		return nil
+	}
+
 	hasMarker := false
 	for _, marker := range f.markers {
 		if strings.Contains(screen.GridText, marker) {
@@ -315,6 +320,26 @@ func DefaultOracles() *CompositeOracle {
 }
 
 // Helper functions
+
+// isPromptScreen detects screens that are prompts or forms without navigable lists.
+// These screens legitimately have no focus markers and should not trigger focus_lost.
+func isPromptScreen(screen *Screen) bool {
+	promptIndicators := []string{
+		"Press Enter to",
+		"Press enter to",
+		"y/n:",
+		"Y/N:",
+		"Are you sure",
+		"(y/N)",
+		"(Y/n)",
+	}
+	for _, indicator := range promptIndicators {
+		if strings.Contains(screen.GridText, indicator) {
+			return true
+		}
+	}
+	return false
+}
 
 func intToStr(n int) string {
 	if n == 0 {
