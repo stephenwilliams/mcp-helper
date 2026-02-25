@@ -391,25 +391,37 @@ func (h *BrowsingHandler) View(p BrowsingViewParams) string {
 		}
 	} else {
 		// Calculate visible range for scrolling
-		visibleHeight := p.Height - 8 // Account for title, help text, filter, status
-		if visibleHeight < 1 {
-			visibleHeight = 10 // Default minimum
+		// Reserve lines: title(1) + tabs(1) + filter(1) + blank(1) + scroll indicator(2) + status(1) + help(2) = ~9
+		reservedLines := 9
+		if p.MultiSelectMode {
+			reservedLines = 11 // Extra lines for tabs, filter bar, and selected count
+		}
+		availableLines := p.Height - reservedLines
+		if availableLines < 3 {
+			availableLines = 3 // Minimum to show at least a few items
+		}
+
+		// Each item takes 2 lines (name + description), so divide available lines by 2
+		// to get the number of items we can display
+		visibleItems := availableLines / 2
+		if visibleItems < 1 {
+			visibleItems = 1
 		}
 
 		start := 0
 		end := len(serverList)
 
 		// Implement scrolling if list is longer than screen
-		if len(serverList) > visibleHeight {
+		if len(serverList) > visibleItems {
 			// Keep cursor centered when possible
-			start = p.Cursor - visibleHeight/2
+			start = p.Cursor - visibleItems/2
 			if start < 0 {
 				start = 0
 			}
-			end = start + visibleHeight
+			end = start + visibleItems
 			if end > len(serverList) {
 				end = len(serverList)
-				start = end - visibleHeight
+				start = end - visibleItems
 				if start < 0 {
 					start = 0
 				}
@@ -495,7 +507,7 @@ func (h *BrowsingHandler) View(p BrowsingViewParams) string {
 		}
 
 		// Show scroll indicator if needed
-		if len(serverList) > visibleHeight {
+		if len(serverList) > visibleItems {
 			s.WriteString("\n" + h.infoStyle.Render(fmt.Sprintf("  Showing %d-%d of %d", start+1, end, len(serverList))))
 		}
 	}
