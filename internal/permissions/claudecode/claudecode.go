@@ -97,6 +97,13 @@ func (a *Adapter) GetMCPServers() ([]mcp.ServerConfig, error) {
 		return nil, fmt.Errorf("failed to read %s: %w", mcpJSONPath, err)
 	}
 
+	// Plugin scope: discover from installed Claude Code plugins
+	pluginServers, err := a.getPluginMCPServers()
+	if err == nil {
+		servers = append(servers, pluginServers...)
+	}
+	// Plugin discovery errors are non-fatal - plugins are optional
+
 	return servers, nil
 }
 
