@@ -977,8 +977,18 @@ func (m *ToolsApproveModel) applyPermissions() tea.Cmd {
 			}
 		}
 
-		// Save permissions
-		err := m.adapter.SavePermissions(m.targetFile, newRules)
+		// Load existing permissions and merge with new rules
+		existing, err := m.adapter.LoadPermissions(m.targetFile)
+		if err != nil {
+			// File might not exist yet, treat as empty
+			existing = []permissions.PermissionRule{}
+		}
+
+		// Merge new rules with existing (handles deduplication and wildcard coverage)
+		merged := permissions.MergeRules(existing, newRules)
+
+		// Save merged permissions
+		err = m.adapter.SavePermissions(m.targetFile, merged)
 		return applyCompleteMsg{err: err}
 	}
 }
